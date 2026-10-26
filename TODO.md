@@ -4,7 +4,7 @@ Dokumen ini adalah **papan kerja** proyek. `IMPLEMENTATION.md` menjelaskan *apa*
 *mengapa*; dokumen ini menjelaskan *urutan*, *kriteria selesai*, dan *commit* untuk
 setiap langkah.
 
-**Status:** Fase 4 selesai (`v0.4.0`). Fase 5 siap dimulai.
+**Status:** Fase 5 selesai (`v0.5.0`). Fase 6 siap dimulai.
 **Terakhir diperbarui:** 2026-10-27
 
 ---
@@ -47,7 +47,7 @@ Tag anotasi dibuat di akhir fase sesuai tabel commit map (§3). Pesan tag:
 | 2 | Content layer (LPS, index animasi, mod) | `[x]` selesai | `v0.2.0` |
 | 3 | Renderer & animation player | `[x]` selesai | `v0.3.0` |
 | 4 | Simulasi core & save | `[x]` selesai | `v0.4.0` |
-| 5 | Interaksi & state machine | `[ ]` belum | `v0.5.0` |
+| 5 | Interaksi & state machine | `[x]` selesai | `v0.5.0` |
 | 6 | Integrasi app (config, IPC, tray) | `[ ]` belum | `v0.6.0` |
 | 7 | Packaging & dokumentasi | `[ ]` belum | `v0.7.0` |
 | 8 | MVP hardening | `[ ]` belum | `v1.0.0` |
@@ -208,15 +208,15 @@ menghormati alpha, (3) click-through bekerja, (4) surface tidak merebut fokus �
 
 ## 9. Fase 5 — Interaksi & state machine
 
-- [ ] Hit area kepala/badan/angkat mengikuti konfigurasi `vup.lps`.
-- [ ] Klik kepala → `Touch_Head`; badan → `Touch_Body`.
-- [ ] Drag → `Raised_Dynamic`; drop → `Raised_Static` lalu `Common`.
-- [ ] Tidur, bangun, dan auto-walk dengan perilaku tepi layar.
-- [ ] State machine prioritas: raised > touch > work > say > move > idle > sleep.
-- [ ] Rantai `A_Start → B_Loop → C_End` dengan fallback ke `Single`.
-- [ ] Varian animasi dipilih oleh mode + seed.
-- [ ] Posisi disimpan per output.
-- [ ] Test state machine tanpa Wayland (headless).
+- [x] Hit area kepala/badan/angkat mengikuti konfigurasi `vup.lps`.
+- [x] Klik kepala → `Touch_Head`; badan → `Touch_Body`.
+- [x] Drag → `Raised_Dynamic`; drop → `Raised_Static` lalu `Common`.
+- [x] Tidur, bangun, dan auto-walk dengan perilaku tepi layar.
+- [x] State machine prioritas: raised > touch > work > say > move > idle > sleep.
+- [x] Rantai `A_Start → B_Loop → C_End` dengan fallback ke `Single`.
+- [x] Varian animasi dipilih oleh mode + seed.
+- [x] Posisi disimpan per output.
+- [x] Test state machine tanpa Wayland (headless).
 
 ---
 

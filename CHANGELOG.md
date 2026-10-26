@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [v0.5.0] - 2026-10-27
+
+### Added
+
+- **Priority Animation State Machine & `A -> B -> C` Chaining (`vpet-app::anim`)**:
+  - Implemented `InteractionController` enforcing state priorities (`Raised > Touch > Working > Saying > Moving > Idle > Sleeping`) with automatic `A_Start -> B_Loop -> C_End` segment chaining and `Single` animation fallback.
+  - Selected animation variants deterministically using current `ModeType` (`Happy`, `Nomal`, `PoorCondition`, `Ill`) and `World` PRNG state.
+- **Logical `500x500` Hit-Region Classifier & Desktop Interactions**:
+  - Added `classify_hit_zone` mapping scaled pet clicks back to `vup.lps` `touchhead`, `touchbody`, and `pinch` zones to trigger `Touch_Head` / `Touch_Body` reactions, stat gains, and `ClickText` speech bubbles.
+  - Added drag-raise (`Raised_Dynamic` -> `Raised_Static` drop), sleep/wake transitions, horizontal auto-walk (`walk.left` / `walk.right`) with screen-edge bounce/flip, per-output saved coordinates, and headless state-machine tests against real `0000_core/pet/vup` assets.
+
 ## [v0.4.0] - 2026-10-27
 
 ### Added
