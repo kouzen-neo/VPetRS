@@ -1,0 +1,36 @@
+# Default to LF line endings for all text files
+* text=auto eol=lf
+
+# Source, configuration, and scripts
+*.rs      text eol=lf diff=rust
+*.toml    text eol=lf
+*.lock    text eol=lf
+*.md      text eol=lf diff=markdown
+*.sh      text eol=lf
+*.kdl     text eol=lf
+*.yml     text eol=lf
+*.yaml    text eol=lf
+*.desktop text eol=lf
+PKGBUILD  text eol=lf
+
+# Documentation classification for GitHub Linguist
+docs/**           linguist-documentation
+IMPLEMENTATION.md linguist-documentation
+TODO.md           linguist-documentation
+CHANGELOG.md      linguist-documentation
+AGENTS.md         linguist-documentation
+
+# Binary assets and archives
+*.png   binary
+*.apng  binary
+*.gif   binary
+*.webp  binary
+*.ico   binary
+*.ttf   binary
+*.otf   binary
+*.ttc   binary
+*.mpak  binary
+*.zlps  binary
+*.zst   binary
+*.gz    binary
+*.xz    binary

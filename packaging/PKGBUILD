@@ -4,13 +4,13 @@ pkgver=r7.0000000
 pkgrel=1
 pkgdesc="Niri-first Wayland desktop pet written in 100% Rust (wlr-layer-shell)"
 arch=('x86_64' 'aarch64')
-url="https://github.com/kouzen-neo/VPetRust"
+url="https://github.com/kouzen-neo/VPetRS"
 license=('MIT' 'Apache-2.0')
 depends=('wayland' 'gcc-libs' 'glibc')
 makedepends=('cargo' 'git')
 provides=('vpet-rs')
 conflicts=('vpet-rs')
-source=("$pkgname::git+https://github.com/kouzen-neo/VPetRust.git")
+source=("$pkgname::git+https://github.com/kouzen-neo/VPetRS.git")
 sha256sums=('SKIP')
 
 pkgver() {

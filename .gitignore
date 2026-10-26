@@ -1,16 +1,33 @@
-# Rust
+# Rust / Cargo build artifacts
 /target/
 **/*.rs.bk
 *.pdb
+*.profraw
+*.profdata
 
-# Runtime / test artifacts
+# Arch Linux makepkg artifacts
+/packaging/pkg/
+/packaging/src/
+/packaging/vpet-rs-git/
+*.pkg.tar.*
+*.src.tar.*
+
+# Runtime sockets, locks, logs, and saves
 *.sock
+/vpet-rs.lock
 *.mpak
+*.mpak.tmp.*
 *.bak.*
+*.log
+*.log.*
+
+# User-supplied VPet content & mods (never bundle upstream art in git)
+/0000_core/
 /content/
 /mod/
+/mods/
 
-# OS / editor
+# OS & editor files
 .DS_Store
 Thumbs.db
 *~
@@ -18,3 +35,5 @@ Thumbs.db
 *.swo
 .idea/
 .vscode/
+.direnv/
+.env
