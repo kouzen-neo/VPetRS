@@ -70,18 +70,35 @@ Arch Linux users can build the AUR-style package from [`packaging/PKGBUILD`](pac
 
 ## Setup & Usage
 
+### 1. Initialize Configuration
+
 ```bash
-vpet-rs init-config                     # writes ~/.config/vpet-rs/config.toml
+vpet-rs init-config                     # writes default ~/.config/vpet-rs/config.toml
 ```
 
-Set `content_root` in `~/.config/vpet-rs/config.toml` to point at your VPet `0000_core` folder:
+### 2. Install VPet Core Assets
 
-```toml
-[app]
-content_root = "~/.local/share/vpet-rs/content/0000_core"
-```
+VPetRS requires the VPet `0000_core` content directory (containing `info.lps` and animation/food data). Choose any of the following options:
 
-Start the pet and control it from the command line:
+- **Automatic (Recommended):**
+  ```bash
+  vpet-rs setup-assets
+  ```
+  This automatically checks local Steam VPet installations (`~/.local/share/Steam/...`), links them if found, or downloads `0000_core` via git sparse-checkout (~1.1 GB, fetching only the assets rather than the full git history) into `~/.local/share/vpet-rs/content/0000_core`.
+
+- **From an existing local folder / clone:**
+  ```bash
+  vpet-rs setup-assets --from /path/to/VPet/VPet-Simulator.Windows/mod/0000_core
+  ```
+
+- **Via helper script:**
+  ```bash
+  ./scripts/download-vpet-assets.sh
+  ```
+
+### 3. Run & Control
+
+Start the pet daemon and control it from the command line:
 
 ```bash
 vpet-rs                                 # start the layer-shell daemon

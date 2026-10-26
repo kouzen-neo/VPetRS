@@ -12,6 +12,15 @@ use anyhow::{Context, Result, bail};
 const LOCAL_DEV_CORE_PATH: &str =
     "/home/kouzen/Documents/VPet/VPet-Simulator.Windows/mod/0000_core";
 
+// ponytail: local fallback path above is for development; removed from release discovery
+fn local_dev_fallback_candidates() -> &'static [&'static str] {
+    if cfg!(debug_assertions) {
+        &[LOCAL_DEV_CORE_PATH]
+    } else {
+        &[]
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct AppPaths {
     pub config_file: PathBuf,
@@ -82,8 +91,11 @@ impl AppPaths {
         for candidate in [
             self.data_dir.join("content").join("0000_core"),
             PathBuf::from("/usr/share/vpet-rs/content/0000_core"),
-            PathBuf::from(LOCAL_DEV_CORE_PATH),
-        ] {
+            PathBuf::from("/usr/local/share/vpet-rs/content/0000_core"),
+        ]
+        .into_iter()
+        .chain(local_dev_fallback_candidates().iter().map(PathBuf::from))
+        {
             if candidate.exists() {
                 return candidate;
             }

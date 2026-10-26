@@ -71,6 +71,16 @@ enum Commands {
         #[arg(long)]
         force: bool,
     },
+    /// Link existing VPet assets or download 0000_core via git sparse-checkout
+    SetupAssets {
+        /// Source path to an existing 0000_core folder (e.g. from Steam or local clone)
+        #[arg(long)]
+        from: Option<PathBuf>,
+
+        /// Destination path (default: ~/.local/share/vpet-rs/content/0000_core)
+        #[arg(long)]
+        dest: Option<PathBuf>,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -133,6 +143,10 @@ fn try_main() -> Result<()> {
             println!("{}", paths.config_file.display());
             Ok(())
         }
+        Some(Commands::SetupAssets { from, dest }) => {
+            let target = dest.unwrap_or_else(|| paths.data_dir.join("content").join("0000_core"));
+            setup_assets_command(from.as_deref(), &target)
+        }
         Some(Commands::Ctl { action }) => {
             let req = match action {
                 CtlAction::Show => IpcRequest::Show,
@@ -179,4 +193,128 @@ fn try_main() -> Result<()> {
             run_daemon(paths, cfg, overrides)
         }
     }
+}
+
+fn setup_assets_command(from: Option<&std::path::Path>, dest: &std::path::Path) -> Result<()> {
+    if dest.join("info.lps").is_file() {
+        println!("VPet assets already present at `{}`", dest.display());
+        return Ok(());
+    }
+
+    if let Some(src) = from {
+        if !src.join("info.lps").is_file() {
+            anyhow::bail!(
+                "source directory `{}` does not contain VPet `info.lps`",
+                src.display()
+            );
+        }
+        if let Some(parent) = dest.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        std::os::unix::fs::symlink(src, dest)
+            .or_else(|_| copy_dir_all(src, dest))
+            .with_context(|| {
+                format!(
+                    "failed to link/copy `{}` to `{}`",
+                    src.display(),
+                    dest.display()
+                )
+            })?;
+        println!(
+            "Linked VPet assets from `{}` -> `{}`",
+            src.display(),
+            dest.display()
+        );
+        return Ok(());
+    }
+
+    // Auto-detect local Steam installations
+    let home = std::env::var_os("HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("/tmp"));
+    for steam_dir in [
+        home.join(".local/share/Steam/steamapps/common/VPet/mod/0000_core"),
+        home.join(".steam/steam/steamapps/common/VPet/mod/0000_core"),
+        home.join(".steam/root/steamapps/common/VPet/mod/0000_core"),
+    ] {
+        if steam_dir.join("info.lps").is_file() {
+            if let Some(parent) = dest.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            std::os::unix::fs::symlink(&steam_dir, dest).with_context(|| {
+                format!(
+                    "failed to symlink Steam assets from `{}`",
+                    steam_dir.display()
+                )
+            })?;
+            println!(
+                "Found VPet on Steam! Linked `{}` -> `{}`",
+                steam_dir.display(),
+                dest.display()
+            );
+            return Ok(());
+        }
+    }
+
+    // If not found locally, fetch 0000_core via git sparse-checkout
+    println!(
+        "No existing VPet installation found. Downloading 0000_core via git sparse-checkout..."
+    );
+    let tmp = tempfile::Builder::new().prefix("vpet-assets-").tempdir()?;
+    let status = std::process::Command::new("git")
+        .args([
+            "clone",
+            "--depth",
+            "1",
+            "--filter=blob:none",
+            "--sparse",
+            "https://github.com/LorisYounger/VPet.git",
+            tmp.path().to_str().unwrap(),
+        ])
+        .status()
+        .context("failed to execute git clone")?;
+    if !status.success() {
+        anyhow::bail!("git clone failed with status {status}");
+    }
+
+    let status = std::process::Command::new("git")
+        .current_dir(tmp.path())
+        .args([
+            "sparse-checkout",
+            "set",
+            "VPet-Simulator.Windows/mod/0000_core",
+        ])
+        .status()
+        .context("failed to execute git sparse-checkout")?;
+    if !status.success() {
+        anyhow::bail!("git sparse-checkout failed with status {status}");
+    }
+
+    let downloaded = tmp.path().join("VPet-Simulator.Windows/mod/0000_core");
+    if !downloaded.join("info.lps").is_file() {
+        anyhow::bail!("downloaded sparse tree missing 0000_core/info.lps");
+    }
+
+    if let Some(parent) = dest.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::rename(&downloaded, dest).or_else(|_| copy_dir_all(&downloaded, dest))?;
+    println!("Successfully installed VPet assets to `{}`", dest.display());
+    Ok(())
+}
+
+fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path) -> Result<()> {
+    fs::create_dir_all(dst)?;
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        let from = entry.path();
+        let to = dst.join(entry.file_name());
+        if ty.is_dir() {
+            copy_dir_all(&from, &to)?;
+        } else {
+            fs::copy(&from, &to)?;
+        }
+    }
+    Ok(())
 }
