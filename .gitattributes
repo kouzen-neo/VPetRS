@@ -13,12 +13,17 @@
 *.desktop text eol=lf
 PKGBUILD  text eol=lf
 
-# Documentation classification for GitHub Linguist
-docs/**           linguist-documentation
-IMPLEMENTATION.md linguist-documentation
-TODO.md           linguist-documentation
-CHANGELOG.md      linguist-documentation
-AGENTS.md         linguist-documentation
+# GitHub Linguist: report the repository as 100% Rust
+*.sh               linguist-detectable=false
+*.kdl              linguist-detectable=false
+*.desktop          linguist-detectable=false
+*.yml              linguist-detectable=false
+PKGBUILD           linguist-detectable=false
+scripts/**         linguist-detectable=false
+packaging/**       linguist-detectable=false
+.github/**         linguist-detectable=false
+docs/**            linguist-documentation
+*.md               linguist-documentation
 
 # Binary assets and archives
 *.png   binary

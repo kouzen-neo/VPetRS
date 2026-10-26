@@ -37,3 +37,7 @@ Thumbs.db
 .vscode/
 .direnv/
 .env
+
+# Local-only planning & agent notes (kept on disk, not published)
+/IMPLEMENTATION.md
+/AGENTS.md

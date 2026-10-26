@@ -114,7 +114,6 @@ Optional niri autostart, `layer-rule`, and keybind snippets are in [`packaging/n
 
 ## Documentation
 
-- [`IMPLEMENTATION.md`](IMPLEMENTATION.md): architecture and design decisions
 - [`CHANGELOG.md`](CHANGELOG.md): release history
 - [`docs/niri.md`](docs/niri.md): niri integration
 - [`docs/ipc.md`](docs/ipc.md): IPC and CLI reference
