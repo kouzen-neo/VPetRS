@@ -4,7 +4,7 @@ Dokumen ini adalah **papan kerja** proyek. `IMPLEMENTATION.md` menjelaskan *apa*
 *mengapa*; dokumen ini menjelaskan *urutan*, *kriteria selesai*, dan *commit* untuk
 setiap langkah.
 
-**Status:** Fase 6 selesai (`v0.6.0`). Fase 7 siap dimulai.
+**Status:** Fase 7 selesai (`v0.7.0`). Fase 8 (MVP hardening `v1.0.0`) siap dimulai.
 **Terakhir diperbarui:** 2026-10-27
 
 ---
@@ -49,7 +49,7 @@ Tag anotasi dibuat di akhir fase sesuai tabel commit map (§3). Pesan tag:
 | 4 | Simulasi core & save | `[x]` selesai | `v0.4.0` |
 | 5 | Interaksi & state machine | `[x]` selesai | `v0.5.0` |
 | 6 | Integrasi app (config, IPC, tray) | `[x]` selesai | `v0.6.0` |
-| 7 | Packaging & dokumentasi | `[ ]` belum | `v0.7.0` |
+| 7 | Packaging & dokumentasi | `[x]` selesai | `v0.7.0` |
 | 8 | MVP hardening | `[ ]` belum | `v1.0.0` |
 | 9 | Post-MVP (gameplay, audio, mods) | `[ ]` belum | — |
 
@@ -236,12 +236,12 @@ menghormati alpha, (3) click-through bekerja, (4) surface tidak merebut fokus �
 
 ## 11. Fase 7 — Packaging & dokumentasi
 
-- [ ] `packaging/PKGBUILD` (`vpet-rs-git`), `.desktop`, `niri-snippet.kdl`.
-- [ ] `docs/niri.md`: autostart, `layer-rule`, keybind, perilaku fullscreen/overview.
-- [ ] `README.md` final: instalasi, konfigurasi, aset VPet, lisensi.
-- [ ] CI: fmt, clippy, test, build, check-no-dotnet.
-- [ ] Snippet `layer-rule` untuk `block-out-from "screencast"` (opsional, dikomentari).
-- [ ] Catatan lisensi aset VPet di README.
+- [x] `packaging/PKGBUILD` (`vpet-rs-git`), `.desktop`, `niri-snippet.kdl`.
+- [x] `docs/niri.md`: autostart, `layer-rule`, keybind, perilaku fullscreen/overview.
+- [x] `README.md` final: instalasi, konfigurasi, aset VPet, lisensi.
+- [x] CI: fmt, clippy, test, build, check-no-dotnet.
+- [x] Snippet `layer-rule` untuk `block-out-from "screencast"` (opsional, dikomentari).
+- [x] Catatan lisensi aset VPet di README.
 
 ---
 

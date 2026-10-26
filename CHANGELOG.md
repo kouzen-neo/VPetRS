@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [v0.7.0] - 2026-10-27
+
+### Added
+
+- **Arch Linux AUR Packaging & Desktop Integration (`packaging/`)**:
+  - Added `packaging/PKGBUILD` (`vpet-rs-git`) with locked Cargo build, test, and zero-`.NET` `check()` verification.
+  - Added `packaging/vpet-rs.desktop` launcher entry and `packaging/niri-snippet.kdl` reference snippet (`layer-rule` with optional `block-out-from "screencast"`, autostart, and IPC keybind examples).
+- **CI Workflow & Niri Documentation**:
+  - Added `.github/workflows/ci.yml` and `scripts/run-headless-test.sh` enforcing `rustfmt`, `clippy -D warnings`, workspace tests, release build, and `scripts/check-no-dotnet.sh`.
+  - Added `docs/niri.md`, `LICENSE-MIT`, and `LICENSE-APACHE`.
+
 ## [v0.6.0] - 2026-10-27
 
 ### Added

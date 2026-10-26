@@ -1,0 +1,17 @@
+// Reference snippet for ~/.config/niri/config.kdl (not applied automatically).
+
+// 1. Optional autostart:
+// spawn-at-startup "vpet-rs"
+
+// 2. Optional layer rule (for example, hide pet from OBS / PipeWire screencasts):
+layer-rule {
+    match namespace="^vpet-rs$"
+    // block-out-from "screencast"
+}
+
+// 3. Optional IPC keybinds:
+// binds {
+//     Mod+Shift+P { spawn "vpet-rs" "ctl" "toggle-clickthrough"; }
+//     Mod+Shift+O { spawn "vpet-rs" "ctl" "hide"; }
+//     Mod+Shift+I { spawn "vpet-rs" "ctl" "show"; }
+// }

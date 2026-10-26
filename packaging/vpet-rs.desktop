@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=VPetRust
+GenericName=Desktop Pet
+Comment=Niri-first Wayland layer-shell desktop pet written in pure Rust
+Exec=vpet-rs
+Terminal=false
+Categories=Utility;Amusement;
+StartupNotify=false
+Keywords=vpet;pet;wayland;niri;layer-shell;

@@ -1,0 +1,49 @@
+# Maintainer: kouzen-neo <kouzen-neo@proton.me>
+pkgname=vpet-rs-git
+pkgver=r7.0000000
+pkgrel=1
+pkgdesc="Niri-first Wayland desktop pet written in 100% Rust (wlr-layer-shell)"
+arch=('x86_64' 'aarch64')
+url="https://github.com/kouzen-neo/VPetRust"
+license=('MIT' 'Apache-2.0')
+depends=('wayland' 'fontconfig' 'dbus' 'gcc-libs' 'glibc')
+makedepends=('cargo' 'git')
+provides=('vpet-rs')
+conflicts=('vpet-rs')
+source=("$pkgname::git+https://github.com/kouzen-neo/VPetRust.git")
+sha256sums=('SKIP')
+
+pkgver() {
+    cd "$srcdir/$pkgname"
+    printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short=7 HEAD)"
+}
+
+prepare() {
+    cd "$srcdir/$pkgname"
+    export RUSTUP_TOOLCHAIN=stable
+    cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+    cd "$srcdir/$pkgname"
+    export RUSTUP_TOOLCHAIN=stable
+    export CARGO_TARGET_DIR=target
+    cargo build --frozen --release -p vpet-app
+}
+
+check() {
+    cd "$srcdir/$pkgname"
+    export RUSTUP_TOOLCHAIN=stable
+    export CARGO_TARGET_DIR=target
+    cargo test --frozen --workspace
+    ./scripts/check-no-dotnet.sh
+}
+
+package() {
+    cd "$srcdir/$pkgname"
+    install -Dm755 "target/release/vpet-rs" "$pkgdir/usr/bin/vpet-rs"
+    install -Dm644 "packaging/vpet-rs.desktop" "$pkgdir/usr/share/applications/vpet-rs.desktop"
+    install -Dm644 "packaging/niri-snippet.kdl" "$pkgdir/usr/share/doc/$pkgname/niri-snippet.kdl"
+    install -Dm644 "LICENSE-MIT" "$pkgdir/usr/share/licenses/$pkgname/LICENSE-MIT"
+    install -Dm644 "LICENSE-APACHE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE-APACHE"
+}
