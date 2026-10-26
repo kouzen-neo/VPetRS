@@ -4,7 +4,7 @@ Dokumen ini adalah **papan kerja** proyek. `IMPLEMENTATION.md` menjelaskan *apa*
 *mengapa*; dokumen ini menjelaskan *urutan*, *kriteria selesai*, dan *commit* untuk
 setiap langkah.
 
-**Status:** Fase 5 selesai (`v0.5.0`). Fase 6 siap dimulai.
+**Status:** Fase 6 selesai (`v0.6.0`). Fase 7 siap dimulai.
 **Terakhir diperbarui:** 2026-10-27
 
 ---
@@ -48,7 +48,7 @@ Tag anotasi dibuat di akhir fase sesuai tabel commit map (§3). Pesan tag:
 | 3 | Renderer & animation player | `[x]` selesai | `v0.3.0` |
 | 4 | Simulasi core & save | `[x]` selesai | `v0.4.0` |
 | 5 | Interaksi & state machine | `[x]` selesai | `v0.5.0` |
-| 6 | Integrasi app (config, IPC, tray) | `[ ]` belum | `v0.6.0` |
+| 6 | Integrasi app (config, IPC, tray) | `[x]` selesai | `v0.6.0` |
 | 7 | Packaging & dokumentasi | `[ ]` belum | `v0.7.0` |
 | 8 | MVP hardening | `[ ]` belum | `v1.0.0` |
 | 9 | Post-MVP (gameplay, audio, mods) | `[ ]` belum | — |
@@ -222,15 +222,15 @@ menghormati alpha, (3) click-through bekerja, (4) surface tidak merebut fokus �
 
 ## 10. Fase 6 — Integrasi app
 
-- [ ] Config `$XDG_CONFIG_HOME/vpet-rs/config.toml`, reload tanpa restart.
-- [ ] Satu instance: lock file di `$XDG_RUNTIME_DIR`.
-- [ ] IPC Unix socket `0600`, JSON per baris; `SO_PEERCRED` check.
-- [ ] CLI `vpet-rs ctl {show,hide,toggle-clickthrough,feed,status,reload,quit}`.
-- [ ] Tray `ksni` (Show/Hide, Click-through, Feed, Reload, Quit).
-- [ ] Autosave berkala + simpan saat keluar.
-- [ ] Multi-output: pilih output, tangani output hilang, pindah surface.
-- [ ] Logging `tracing` ke file + stderr, rotasi sederhana.
-- [ ] `docs/ipc.md`.
+- [x] Config `$XDG_CONFIG_HOME/vpet-rs/config.toml`, reload tanpa restart.
+- [x] Satu instance: lock file di `$XDG_RUNTIME_DIR`.
+- [x] IPC Unix socket `0600`, JSON per baris; `SO_PEERCRED` check.
+- [x] CLI `vpet-rs ctl {show,hide,toggle-clickthrough,feed,status,reload,quit}`.
+- [x] Tray `ksni` (Show/Hide, Click-through, Feed, Reload, Quit).
+- [x] Autosave berkala + simpan saat keluar.
+- [x] Multi-output: pilih output, tangani output hilang, pindah surface.
+- [x] Logging `tracing` ke file + stderr, rotasi sederhana.
+- [x] `docs/ipc.md`.
 
 ---
 

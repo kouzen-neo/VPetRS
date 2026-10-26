@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [v0.6.0] - 2026-10-27
+
+### Added
+
+- **TOML Configuration & Live Hot-Reload (`vpet-app::config`)**:
+  - Added `$XDG_CONFIG_HOME/vpet-rs/config.toml` (`[app]`, `[display]`, `[pet]`, `[simulation]`, `[audio]`) with `vpet-rs init-config` generator and automatic mtime + IPC live reload (`layer`, `scale`, `output`, `click_through`, `auto_walk`, `cache_mb`, `autosave_secs`).
+- **Unix Socket IPC & `vpet-rs ctl` CLI (`vpet-app::ipc`)**:
+  - Added `$XDG_RUNTIME_DIR/vpet-rs.sock` (`0600` mode, `SO_PEERCRED` UID verification, `4096`-byte line cap) and `vpet-rs ctl {show, hide, toggle-clickthrough, layer, feed, sleep, wake, say, reload, status, quit}` subcommands.
+  - Added `docs/ipc.md` documenting CLI usage, security invariants, and JSON wire payloads.
+- **StatusNotifierItem Tray & Full Daemon Orchestration (`vpet-app`)**:
+  - Integrated `ksni` StatusNotifierItem tray for `waybar` with custom `32x32` ARGB mascot icon and live toggle checkmarks (`Show Pet`, `Click-Through`, `Overlay Above Fullscreen`, `Sleeping`, `Feed Snack`, `Reload Config`, `Quit`).
+  - Added single-instance `flock` guard (`$XDG_RUNTIME_DIR/vpet-rs.lock`), size-capped rolling file+stderr `tracing` logs (`<= 2 MiB`), periodic autosave, clean shutdown save on `SIGINT`/`SIGTERM`/`quit`, and lazy `FontSystem` initialization.
+
 ## [v0.5.0] - 2026-10-27
 
 ### Added
