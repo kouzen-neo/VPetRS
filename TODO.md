@@ -4,7 +4,7 @@ Dokumen ini adalah **papan kerja** proyek. `IMPLEMENTATION.md` menjelaskan *apa*
 *mengapa*; dokumen ini menjelaskan *urutan*, *kriteria selesai*, dan *commit* untuk
 setiap langkah.
 
-**Status:** Fase 3 selesai (`v0.3.0`). Fase 4 siap dimulai.
+**Status:** Fase 4 selesai (`v0.4.0`). Fase 5 siap dimulai.
 **Terakhir diperbarui:** 2026-10-27
 
 ---
@@ -46,7 +46,7 @@ Tag anotasi dibuat di akhir fase sesuai tabel commit map (§3). Pesan tag:
 | 1 | Gate 0 — spike layer-shell niri | `[x]` selesai | `v0.1.0` |
 | 2 | Content layer (LPS, index animasi, mod) | `[x]` selesai | `v0.2.0` |
 | 3 | Renderer & animation player | `[x]` selesai | `v0.3.0` |
-| 4 | Simulasi core & save | `[ ]` belum | `v0.4.0` |
+| 4 | Simulasi core & save | `[x]` selesai | `v0.4.0` |
 | 5 | Interaksi & state machine | `[ ]` belum | `v0.5.0` |
 | 6 | Integrasi app (config, IPC, tray) | `[ ]` belum | `v0.6.0` |
 | 7 | Packaging & dokumentasi | `[ ]` belum | `v0.7.0` |
@@ -192,17 +192,17 @@ menghormati alpha, (3) click-through bekerja, (4) surface tidak merebut fokus �
 
 ## 8. Fase 4 — Simulasi core & save
 
-- [ ] `PetState`: name, level, exp, money, strength, food, drink, feeling, health,
+- [x] `PetState`: name, level, exp, money, strength, food, drink, feeling, health,
       likability, mode.
-- [ ] Formula stats dan level-up; clamp ke batas level.
-- [ ] Mode turunan: `Nomal`, `Happy`, `PoorCondition`, `Ill`.
-- [ ] Item & makanan: konsumsi, efek, batas stok.
-- [ ] Tick deterministik 10 Hz dengan waktu disuntikkan.
-- [ ] RNG deterministik ber-seed dari save.
-- [ ] Save v1 (`rmp-serde`): tulis temp → fsync → rename → rotasi 5 backup.
-- [ ] Pemulihan dari save korup ke backup terbaru.
-- [ ] Test: roundtrip, migrasi placeholder, expiry buff.
-- [ ] `docs/gameplay-formulas.md`, `docs/save-format.md`.
+- [x] Formula stats dan level-up; clamp ke batas level.
+- [x] Mode turunan: `Nomal`, `Happy`, `PoorCondition`, `Ill`.
+- [x] Item & makanan: konsumsi, efek, batas stok.
+- [x] Tick deterministik 10 Hz dengan waktu disuntikkan.
+- [x] RNG deterministik ber-seed dari save.
+- [x] Save v1 (`rmp-serde`): tulis temp → fsync → rename → rotasi 5 backup.
+- [x] Pemulihan dari save korup ke backup terbaru.
+- [x] Test: roundtrip, migrasi placeholder, expiry buff.
+- [x] `docs/gameplay-formulas.md`, `docs/save-format.md`.
 
 ---
 

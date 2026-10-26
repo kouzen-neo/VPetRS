@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [v0.4.0] - 2026-10-27
+
+### Added
+
+- **Pure Deterministic Simulation Core (`vpet-core`)**:
+  - Implemented `PetState` with upstream `GameSave_VPet` stat caps (`StrengthMax`, `FeelingMax`), leveling (`200 * Level - 100`), starvation spillover into `Health`/`Likability`, buffered digestion (`StoreTake`), and `CalMode` (`Happy`, `Nomal`, `PoorCondition`, `Ill`).
+  - Added `World` 10 Hz deterministic tick engine with injected timestamps, seeded `SplitMix64` PRNG (`DeterministicRng`), stack-bounded `Inventory`, `FoodEffect` consumption, timed `BuffState` multipliers, and `WorkSession` progression while keeping `vpet-core` 100% free of filesystem and wall-clock I/O.
+- **Crash-Safe MessagePack Save System & Backup Recovery**:
+  - Added `SaveFile` (`rmp-serde` named MessagePack `v1`) with explicit schema migration (`migrate_v0_to_v1`) and per-output saved coordinates.
+  - Added `SaveStore` atomic writer (`temp -> fsync -> .bak.1..5 rotation -> rename -> dir fsync`) with automatic fallback to `.bak.1`..`.bak.5` when primary save data is corrupted.
+  - Added `docs/gameplay-formulas.md` and `docs/save-format.md`.
+
 ## [v0.3.0] - 2026-10-27
 
 ### Added

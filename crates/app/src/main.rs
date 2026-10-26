@@ -1,5 +1,7 @@
 //! VPetRust entrypoint — Phase 1 (Gate 0) `wlr-layer-shell` spike on niri.
 
+pub mod persistence;
+
 use std::{
     env,
     path::{Path, PathBuf},
