@@ -93,6 +93,7 @@ impl RuntimeState {
                     self.world.pet.level,
                     self.world.pet.mode.as_str()
                 ),
+                pet_level: self.world.pet.level,
                 visible: self.shell.visible(),
                 click_through: self.shell.click_through(),
                 overlay: self.shell.layer_mode() == LayerMode::Overlay,
@@ -640,6 +641,7 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
                     world.pet.level,
                     world.pet.mode.as_str()
                 ),
+                pet_level: world.pet.level,
                 visible: true,
                 click_through: shell.click_through(),
                 overlay: shell.layer_mode() == LayerMode::Overlay,

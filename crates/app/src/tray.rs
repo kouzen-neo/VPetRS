@@ -22,6 +22,7 @@ pub enum TrayCommand {
 #[derive(Debug, Clone)]
 pub struct TraySnapshot {
     pub title: String,
+    pub pet_level: u32,
     pub visible: bool,
     pub click_through: bool,
     pub overlay: bool,
@@ -35,6 +36,7 @@ impl Default for TraySnapshot {
     fn default() -> Self {
         Self {
             title: "VPetRS".to_owned(),
+            pet_level: 1,
             visible: true,
             click_through: false,
             overlay: false,
@@ -155,14 +157,22 @@ impl ksni::Tray for VPetTray {
                 .into(),
             );
         } else if !self.snap.available_works.is_empty() {
+            let cur_lv = self.snap.pet_level;
             let sub_items: Vec<ksni::MenuItem<Self>> = self
                 .snap
                 .available_works
                 .iter()
                 .map(|(name, req_lv)| {
                     let owned_name = name.clone();
+                    let unlocked = cur_lv >= *req_lv;
+                    let label = if unlocked {
+                        name.clone()
+                    } else {
+                        format!("{name} (Requires Lv.{req_lv})")
+                    };
                     StandardItem {
-                        label: format!("{name} (Lv.{req_lv})"),
+                        label,
+                        enabled: unlocked,
                         activate: Box::new(move |this: &mut Self| {
                             let _ = this.tx.send(TrayCommand::StartWork(owned_name.clone()));
                         }),
