@@ -160,6 +160,10 @@ impl World {
         Ok(())
     }
 
+    pub fn cancel_work(&mut self) -> Option<WorkSession> {
+        self.active_work.take()
+    }
+
     /// Advance the world deterministically by `dt_secs` (standard: `0.1` s at 10 Hz).
     pub fn tick(&mut self, dt_secs: f64, now_unix: i64) {
         let dt = dt_secs.clamp(0.0, 60.0);

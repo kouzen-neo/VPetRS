@@ -31,6 +31,8 @@ pub enum IpcRequest {
     Sleep,
     Wake,
     Say { text: String },
+    Work { name: Option<String> },
+    CancelWork,
     Reload,
     Status,
     Quit,
@@ -50,6 +52,7 @@ pub struct StatusData {
     pub likability: f64,
     pub mode: String,
     pub sleeping: bool,
+    pub active_work: Option<String>,
     pub visible: bool,
     pub click_through: bool,
     pub layer: String,
@@ -223,6 +226,11 @@ fn validate_request(req: IpcRequest) -> std::result::Result<IpcRequest, String> 
             if !mode.eq_ignore_ascii_case("top") && !mode.eq_ignore_ascii_case("overlay") =>
         {
             return Err("layer mode must be `top` or `overlay`".to_owned());
+        }
+        IpcRequest::Work { name: Some(name) }
+            if name.trim().is_empty() || name.contains('/') || name.contains('\0') =>
+        {
+            return Err("invalid work task name".to_owned());
         }
         _ => {}
     }

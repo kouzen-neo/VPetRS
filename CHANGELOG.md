@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [v1.1.0] - 2026-10-27
+
+### Added
+
+- **Work, Study, and Play System (`vpet-app`)**:
+  - Wired loaded `vup.lps` work definitions (`Copywriting`, `Study`, `PlayONE`, `GrilledSausage`, `FixMenu`, `WorkClean`, `WorkTWO`, `Calligraphy`, `StudyPaint`, `RemoveObject`, `RopeSkipping`, `PlayWater`) into simulation `WorkSession` with rate scaling, finish bonuses, and completion speech bubbles.
+  - Added CLI commands `vpet-rs ctl works`, `vpet-rs ctl work [name]`, and `vpet-rs ctl cancel-work`.
+  - Added StatusNotifierItem tray submenu under "Work / Study / Play" with live job progress countdown (`Working: <Name> (<M>m left)`) and cancellation.
+- **Legacy VPet Save Importer (`vpet-rs import-save`)**:
+  - Added one-way conversion from legacy VPet-Simulator `Save.lps` / `GameSave_v2` into native atomic MessagePack saves (`~/.local/share/vpet-rs/saves/<profile>.mpak`).
+- **Theme Color Application**:
+  - Bound active `ThemeDef` colors (`Primary`, `PrimaryLighter`, `PrimaryText`) to `BubbleStyle` for styled chat bubbles.
+
 ## [v1.0.1] - 2026-10-27
 
 ### Fixed

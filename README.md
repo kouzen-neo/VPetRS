@@ -106,10 +106,14 @@ vpet-rs ctl status                      # stats, mode, layer, output, position (
 vpet-rs ctl toggle-clickthrough         # toggle click-through
 vpet-rs ctl layer overlay               # switch between `top` and `overlay`
 vpet-rs ctl feed "Fruit Juice"          # feed an item from the food database
+vpet-rs ctl works                       # list all work/study/play tasks
+vpet-rs ctl work "Copywriting"          # start working
+vpet-rs ctl cancel-work                 # cancel active work
 vpet-rs ctl say "Hello niri!"           # show a speech bubble
 vpet-rs ctl sleep                       # put the pet to sleep (or `wake`)
 vpet-rs ctl reload                      # reload config.toml
 vpet-rs ctl quit                        # save and exit
+vpet-rs import-save /path/to/Save.lps   # import legacy VPet-Simulator save
 ```
 
 Optional niri autostart, `layer-rule`, and keybind snippets are in [`packaging/niri-snippet.kdl`](packaging/niri-snippet.kdl) and [`docs/niri.md`](docs/niri.md). Nothing is added to your niri config automatically.

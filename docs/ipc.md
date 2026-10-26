@@ -19,6 +19,9 @@ vpet-rs ctl show                       # Show pet surface
 vpet-rs ctl hide                       # Hide pet surface and clear input region
 vpet-rs ctl layer overlay              # Switch between `top` and `overlay`
 vpet-rs ctl feed "Fruit Juice"         # Feed specific item (or `snack` for default)
+vpet-rs ctl works                      # List all work, study, and play tasks
+vpet-rs ctl work "Copywriting"         # Start task (or `vpet-rs ctl work` for first available)
+vpet-rs ctl cancel-work                # Cancel active task
 vpet-rs ctl sleep                      # Put pet to sleep
 vpet-rs ctl wake                       # Wake pet up
 vpet-rs ctl say "Hello niri!"          # Show a speech bubble above the pet
@@ -36,6 +39,8 @@ Requests:
 {"cmd":"hide"}
 {"cmd":"layer","mode":"overlay"}
 {"cmd":"feed","item":"Fruit Juice"}
+{"cmd":"work","name":"Copywriting"}
+{"cmd":"cancel-work"}
 {"cmd":"sleep"}
 {"cmd":"wake"}
 {"cmd":"say","text":"Hello!"}

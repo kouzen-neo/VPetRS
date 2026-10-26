@@ -12,6 +12,8 @@ pub enum TrayCommand {
     SetOverlay(bool),
     ToggleSleep,
     FeedSnack,
+    StartWork(String),
+    CancelWork,
     ReloadConfig,
     Quit,
 }
@@ -23,16 +25,20 @@ pub struct TraySnapshot {
     pub click_through: bool,
     pub overlay: bool,
     pub sleeping: bool,
+    pub active_work: Option<(String, u32)>,
+    pub available_works: Vec<(String, u32)>,
 }
 
 impl Default for TraySnapshot {
     fn default() -> Self {
         Self {
-            title: "VPetRust".to_owned(),
+            title: "VPetRS".to_owned(),
             visible: true,
             click_through: false,
             overlay: false,
             sleeping: false,
+            active_work: None,
+            available_works: Vec::new(),
         }
     }
 }
@@ -66,9 +72,9 @@ impl ksni::Tray for VPetTray {
     }
 
     fn menu(&self) -> Vec<ksni::MenuItem<Self>> {
-        use ksni::menu::{CheckmarkItem, MenuItem, StandardItem};
+        use ksni::menu::{CheckmarkItem, MenuItem, StandardItem, SubMenu};
 
-        vec![
+        let mut items = vec![
             StandardItem {
                 label: self.snap.title.clone(),
                 enabled: false,
@@ -122,6 +128,59 @@ impl ksni::Tray for VPetTray {
                 ..Default::default()
             }
             .into(),
+        ];
+
+        // Work / Study / Play section
+        if let Some((work_name, rem_mins)) = &self.snap.active_work {
+            items.push(MenuItem::Separator);
+            items.push(
+                StandardItem {
+                    label: format!("Working: {work_name} ({rem_mins}m left)"),
+                    enabled: false,
+                    ..Default::default()
+                }
+                .into(),
+            );
+            items.push(
+                StandardItem {
+                    label: "Cancel Work".to_owned(),
+                    activate: Box::new(|this: &mut Self| {
+                        let _ = this.tx.send(TrayCommand::CancelWork);
+                    }),
+                    ..Default::default()
+                }
+                .into(),
+            );
+        } else if !self.snap.available_works.is_empty() {
+            let sub_items: Vec<ksni::MenuItem<Self>> = self
+                .snap
+                .available_works
+                .iter()
+                .map(|(name, req_lv)| {
+                    let owned_name = name.clone();
+                    StandardItem {
+                        label: format!("{name} (Lv.{req_lv})"),
+                        activate: Box::new(move |this: &mut Self| {
+                            let _ = this.tx.send(TrayCommand::StartWork(owned_name.clone()));
+                        }),
+                        ..Default::default()
+                    }
+                    .into()
+                })
+                .collect();
+
+            items.push(
+                SubMenu {
+                    label: "Work / Study / Play".to_owned(),
+                    submenu: sub_items,
+                    ..Default::default()
+                }
+                .into(),
+            );
+        }
+
+        items.push(MenuItem::Separator);
+        items.push(
             StandardItem {
                 label: "Reload Config".to_owned(),
                 activate: Box::new(|this: &mut Self| {
@@ -130,7 +189,8 @@ impl ksni::Tray for VPetTray {
                 ..Default::default()
             }
             .into(),
-            MenuItem::Separator,
+        );
+        items.push(
             StandardItem {
                 label: "Quit".to_owned(),
                 activate: Box::new(|this: &mut Self| {
@@ -139,7 +199,9 @@ impl ksni::Tray for VPetTray {
                 ..Default::default()
             }
             .into(),
-        ]
+        );
+
+        items
     }
 }
 

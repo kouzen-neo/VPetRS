@@ -51,7 +51,7 @@ Tag anotasi dibuat di akhir fase sesuai tabel commit map (§3). Pesan tag:
 | 6 | Integrasi app (config, IPC, tray) | `[x]` selesai | `v0.6.0` |
 | 7 | Packaging & dokumentasi | `[x]` selesai | `v0.7.0` |
 | 8 | MVP hardening | `[x]` selesai | `v1.0.0` |
-| 9 | Post-MVP (gameplay, audio, mods) | `[ ]` belum | — |
+| 9 | Post-MVP (work/study/play, save import, theme styling) | `[x]` selesai | `v1.1.0` |
 
 Legenda status: `[ ]` belum, `[~]` dikerjakan, `[x]` selesai, `[!]` terblokir.
 
@@ -256,18 +256,16 @@ menghormati alpha, (3) click-through bekerja, (4) surface tidak merebut fokus �
 
 ---
 
-## 13. Fase 9 — Post-MVP (belum dijadwalkan)
+## 13. Fase 9 — Post-MVP
 
-Urutan yang diusulkan, masing-masing jadi fase sendiri saat dimulai:
-
-1. Work / study / play + buff + schedule.
-2. Audio (`rodio`) untuk SFX dan voice.
-3. Data mod lengkap + tema + lokalisasi.
-4. Chat bubble lanjutan, gallery.
-5. Plugin WASM (`wasmtime`) atau Rhai.
-6. Steam / Workshop (`steamworks`).
-7. Import save VPet.
-8. UI settings (window `xdg_toplevel` terpisah, bukan layer-shell).
+- [x] Work / study / play (`Copywriting`, `Study`, `Gaming`, `Barbecue`, dll.) + Tray submenu + CLI (`vpet-rs ctl works`, `work`, `cancel-work`).
+- [x] Import save VPet legacy (`.lps` -> atomic `.mpak`) via `vpet-rs import-save <Save.lps>`.
+- [x] Pewarnaan chat bubble mengikuti `ThemeDef` (`Primary`, `PrimaryLighter`, `PrimaryText`).
+- [x] Asset installer & Steam auto-link (`vpet-rs setup-assets`).
+- [ ] Audio (`rodio`) untuk SFX dan voice.
+- [ ] Plugin WASM (`wasmtime`) atau Rhai sandbox.
+- [ ] Steam / Workshop (`vpet-steam`).
+- [ ] UI settings terpisah (`xdg_toplevel`).
 
 ---
 

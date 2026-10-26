@@ -3,6 +3,7 @@
 pub mod anim;
 pub mod app_loop;
 pub mod config;
+pub mod import;
 pub mod ipc;
 pub mod logging;
 pub mod paths;
@@ -81,6 +82,15 @@ enum Commands {
         #[arg(long)]
         dest: Option<PathBuf>,
     },
+    /// Import an existing legacy VPet Save.lps into VPetRS
+    ImportSave {
+        /// Path to the legacy Save.lps file
+        path: PathBuf,
+
+        /// Target profile name
+        #[arg(long, default_value = "default")]
+        profile: String,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -104,6 +114,15 @@ enum CtlAction {
     Wake,
     /// Display a speech bubble above the pet
     Say { text: String },
+    /// List available work, study, and play tasks
+    Works,
+    /// Start a work, study, or play task by name (or first available if omitted)
+    Work {
+        #[arg(default_value = "")]
+        name: String,
+    },
+    /// Cancel the active work session
+    CancelWork,
     /// Reload `config.toml` without restarting
     Reload,
     /// Print daemon & pet status JSON
@@ -147,6 +166,18 @@ fn try_main() -> Result<()> {
             let target = dest.unwrap_or_else(|| paths.data_dir.join("content").join("0000_core"));
             setup_assets_command(from.as_deref(), &target)
         }
+        Some(Commands::ImportSave { path, profile }) => {
+            let world = crate::import::import_legacy_vpet_save(&path, &profile)?;
+            let store = crate::persistence::SaveStore::new(&paths.saves_dir);
+            let saved = store.save_world(&world)?;
+            println!(
+                "Successfully imported `{}` into profile `{}` -> `{}`",
+                path.display(),
+                profile,
+                saved.display()
+            );
+            Ok(())
+        }
         Some(Commands::Ctl { action }) => {
             let req = match action {
                 CtlAction::Show => IpcRequest::Show,
@@ -157,6 +188,16 @@ fn try_main() -> Result<()> {
                 CtlAction::Sleep => IpcRequest::Sleep,
                 CtlAction::Wake => IpcRequest::Wake,
                 CtlAction::Say { text } => IpcRequest::Say { text },
+                CtlAction::Works => IpcRequest::Work { name: None },
+                CtlAction::Work { name } => {
+                    let opt = if name.trim().is_empty() {
+                        None
+                    } else {
+                        Some(name)
+                    };
+                    IpcRequest::Work { name: opt }
+                }
+                CtlAction::CancelWork => IpcRequest::CancelWork,
                 CtlAction::Reload => IpcRequest::Reload,
                 CtlAction::Status => IpcRequest::Status,
                 CtlAction::Quit => IpcRequest::Quit,

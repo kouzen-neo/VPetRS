@@ -74,6 +74,17 @@ struct RuntimeState {
 impl RuntimeState {
     fn sync_tray(&self) {
         if let Some(tray) = &self.tray {
+            let active_work = self
+                .world
+                .active_work
+                .as_ref()
+                .map(|w| (w.name.clone(), (w.remaining_secs / 60.0).ceil() as u32));
+            let available_works = self
+                .pet_cfg
+                .works
+                .iter()
+                .map(|w| (w.name.clone(), w.level_limit))
+                .collect();
             tray.sync(TraySnapshot {
                 title: format!(
                     "{} — Lv.{} ({})",
@@ -85,6 +96,8 @@ impl RuntimeState {
                 click_through: self.shell.click_through(),
                 overlay: self.shell.layer_mode() == LayerMode::Overlay,
                 sleeping: self.world.pet.sleeping,
+                active_work,
+                available_works,
             });
         }
     }
@@ -131,6 +144,82 @@ impl RuntimeState {
         Ok(label)
     }
 
+    fn start_work_by_name(&mut self, query: Option<&str>) -> std::result::Result<String, String> {
+        let work_def = if let Some(q) = query {
+            self.pet_cfg
+                .works
+                .iter()
+                .find(|w| w.name.eq_ignore_ascii_case(q) || w.graph.eq_ignore_ascii_case(q))
+                .cloned()
+                .ok_or_else(|| format!("unknown work/study/play task `{q}`"))?
+        } else {
+            self.pet_cfg
+                .works
+                .iter()
+                .find(|w| self.world.pet.level >= w.level_limit)
+                .cloned()
+                .ok_or_else(|| "no available work tasks for current pet level".to_owned())?
+        };
+
+        if self.world.pet.level < work_def.level_limit {
+            return Err(format!(
+                "task `{}` requires level {} (current: {})",
+                work_def.name, work_def.level_limit, self.world.pet.level
+            ));
+        }
+
+        let (money_rate, exp_rate) = match work_def.kind {
+            vpet_content::WorkKind::Work => (work_def.money_base, 2.0),
+            vpet_content::WorkKind::Study => (-work_def.money_base, 10.0),
+            vpet_content::WorkKind::Play => (-work_def.money_base, 4.0),
+        };
+
+        let session = vpet_core::WorkSession::new(
+            work_def.name.clone(),
+            work_def.graph.clone(),
+            work_def.time_mins,
+            money_rate,
+            exp_rate,
+            work_def.strength_food,
+            work_def.strength_drink,
+            work_def.feeling,
+            work_def.finish_bonus,
+        );
+
+        let name = work_def.name.clone();
+        let graph = work_def.graph.clone();
+        self.world
+            .start_work(session, work_def.level_limit)
+            .map_err(|e| e.to_string())?;
+
+        self.anim.request_state(
+            crate::anim::ActionState::Working { graph },
+            true,
+            &self.anim_index,
+            &mut self.world,
+        );
+        self.anim.show_bubble(format!("Started {name}!"), 3_000);
+        self.sync_tray();
+        Ok(name)
+    }
+
+    fn cancel_active_work(&mut self) -> bool {
+        if let Some(w) = self.world.cancel_work() {
+            self.anim.request_state(
+                crate::anim::ActionState::Idle,
+                true,
+                &self.anim_index,
+                &mut self.world,
+            );
+            self.anim
+                .show_bubble(format!("Canceled {}!", w.name), 2_500);
+            self.sync_tray();
+            true
+        } else {
+            false
+        }
+    }
+
     fn status_snapshot(&self) -> StatusData {
         let (px, py) = self.shell.position();
         StatusData {
@@ -146,6 +235,7 @@ impl RuntimeState {
             likability: self.world.pet.likability,
             mode: self.world.pet.mode.as_str().to_owned(),
             sleeping: self.world.pet.sleeping,
+            active_work: self.world.active_work.as_ref().map(|w| w.name.clone()),
             visible: self.shell.visible(),
             click_through: self.shell.click_through(),
             layer: self.shell.layer_mode().as_str().to_owned(),
@@ -220,6 +310,43 @@ impl RuntimeState {
                 self.shell.present();
                 IpcResponse::success(serde_json::json!({ "speaking": true }))
             }
+            IpcRequest::Work { name } => {
+                if let Some(n) = name.filter(|s| !s.trim().is_empty()) {
+                    match self.start_work_by_name(Some(&n)) {
+                        Ok(started) => {
+                            self.refresh_visuals();
+                            self.shell.present();
+                            IpcResponse::success(serde_json::json!({ "started": started }))
+                        }
+                        Err(err) => IpcResponse::fail(err),
+                    }
+                } else {
+                    let available: Vec<_> = self
+                        .pet_cfg
+                        .works
+                        .iter()
+                        .map(|w| {
+                            serde_json::json!({
+                                "name": w.name,
+                                "kind": format!("{:?}", w.kind),
+                                "level_required": w.level_limit,
+                                "time_mins": w.time_mins,
+                                "money_base": w.money_base,
+                            })
+                        })
+                        .collect();
+                    IpcResponse::success(serde_json::json!({
+                        "active": self.world.active_work.as_ref().map(|w| &w.name),
+                        "works": available,
+                    }))
+                }
+            }
+            IpcRequest::CancelWork => {
+                let canceled = self.cancel_active_work();
+                self.refresh_visuals();
+                self.shell.present();
+                IpcResponse::success(serde_json::json!({ "canceled": canceled }))
+            }
             IpcRequest::Reload => {
                 let reloaded = AppConfig::load_or_default(&self.paths.config_file);
                 self.apply_reloaded_config(reloaded);
@@ -262,6 +389,16 @@ impl RuntimeState {
             }
             TrayCommand::FeedSnack => {
                 let _ = self.feed_by_name("snack");
+                self.refresh_visuals();
+                self.shell.present();
+            }
+            TrayCommand::StartWork(name) => {
+                let _ = self.start_work_by_name(Some(&name));
+                self.refresh_visuals();
+                self.shell.present();
+            }
+            TrayCommand::CancelWork => {
+                let _ = self.cancel_active_work();
                 self.refresh_visuals();
                 self.shell.present();
             }
@@ -391,12 +528,23 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
 
     preload_essential_clips(&anim_index, &world, sprite_px, &cache, &mut loader);
 
-    let theme_fonts: Vec<std::path::PathBuf> = content
+    let (theme_fonts, bubble_style) = if let Some(theme) = content
         .themes
         .get("default")
         .or_else(|| content.themes.values().next())
-        .map(|t| t.fonts.clone())
-        .unwrap_or_default();
+    {
+        let style = BubbleStyle {
+            bg_rgba: theme.color_or("primarylighter", [252, 253, 255, 240]),
+            border_rgba: theme.color_or("primary", [129, 212, 250, 255]),
+            text_rgba: theme.color_or("primarytext", [30, 36, 48, 255]),
+            font_px: 15.0,
+            padding_px: 10,
+            corner_radius: 10.0,
+        };
+        (theme.fonts.clone(), style)
+    } else {
+        (Vec::new(), BubbleStyle::default())
+    };
 
     let mut event_loop: EventLoop<'static, RuntimeState> =
         EventLoop::try_new().context("failed to initialize calloop event loop")?;
@@ -454,6 +602,12 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
                 click_through: shell.click_through(),
                 overlay: shell.layer_mode() == LayerMode::Overlay,
                 sleeping: world.pet.sleeping,
+                active_work: None,
+                available_works: pet_cfg
+                    .works
+                    .iter()
+                    .map(|w| (w.name.clone(), w.level_limit))
+                    .collect(),
             },
             tray_tx,
         )
@@ -503,7 +657,18 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
     loop_handle
         .insert_source(Timer::from_duration(sim_period), move |_, (), state| {
             let dt_secs = 1.0 / f64::from(state.config.simulation.tick_hz.clamp(1, 60));
+            let had_work = state.world.active_work.is_some();
             state.world.tick(dt_secs, unix_now());
+            if had_work && state.world.active_work.is_none() {
+                state.anim.request_state(
+                    crate::anim::ActionState::Idle,
+                    true,
+                    &state.anim_index,
+                    &mut state.world,
+                );
+                state.anim.show_bubble("Work completed! Great job!", 4_000);
+                state.sync_tray();
+            }
 
             if let Some(reloaded) = state.watcher.check_modified() {
                 state.apply_reloaded_config(reloaded);
@@ -630,7 +795,7 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
         loader,
         bubble_renderer: None,
         theme_fonts,
-        bubble_style: BubbleStyle::default(),
+        bubble_style,
         fallback_sprite,
         anim,
         shell,
