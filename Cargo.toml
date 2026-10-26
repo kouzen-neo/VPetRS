@@ -1,0 +1,39 @@
+[workspace]
+resolver = "3"
+members = [
+  "crates/core",
+  "crates/content",
+  "crates/render",
+  "crates/wayland",
+  "crates/app",
+  "crates/mods",
+  "crates/steam",
+]
+default-members = [
+  "crates/core",
+  "crates/content",
+  "crates/render",
+  "crates/wayland",
+  "crates/app",
+  "crates/mods",
+]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+vpet-core = { path = "crates/core" }
+vpet-content = { path = "crates/content" }
+vpet-render = { path = "crates/render" }
+vpet-wayland = { path = "crates/wayland" }
+vpet-mods = { path = "crates/mods" }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true
+panic = "abort"

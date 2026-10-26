@@ -1,0 +1,17 @@
+[package]
+name = "vpet-app"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "vpet-rs"
+path = "src/main.rs"
+
+[dependencies]
+vpet-core.workspace = true
+vpet-content.workspace = true
+vpet-render.workspace = true
+vpet-wayland.workspace = true
+vpet-mods.workspace = true
