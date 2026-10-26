@@ -19,6 +19,7 @@ pub struct AppConfig {
     pub pet: PetSection,
     pub simulation: SimulationSection,
     pub audio: AudioSection,
+    pub ai: AiSection,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -142,6 +143,30 @@ impl Default for AudioSection {
         Self {
             enabled: true,
             volume: 0.8,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct AiSection {
+    pub enabled: bool,
+    pub api_base: String,
+    pub api_key: String,
+    pub model: String,
+    pub system_prompt: String,
+    pub timeout_secs: u64,
+}
+
+impl Default for AiSection {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            api_base: "http://localhost:20128/v1".to_owned(),
+            api_key: String::new(),
+            model: "9routerall".to_owned(),
+            system_prompt: "You are Loris, a lively and affectionate desktop pet. Keep your replies concise (1-2 short sentences) so they fit nicely in a speech bubble.".to_owned(),
+            timeout_secs: 25,
         }
     }
 }

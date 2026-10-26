@@ -31,6 +31,8 @@ pub enum IpcRequest {
     Sleep,
     Wake,
     Say { text: String },
+    Chat { prompt: String },
+    PromptInput,
     Work { name: Option<String> },
     CancelWork,
     Reload,
@@ -53,6 +55,8 @@ pub struct StatusData {
     pub mode: String,
     pub sleeping: bool,
     pub active_work: Option<String>,
+    pub ai_enabled: bool,
+    pub ai_model: String,
     pub visible: bool,
     pub click_through: bool,
     pub layer: String,
@@ -221,6 +225,9 @@ fn validate_request(req: IpcRequest) -> std::result::Result<IpcRequest, String> 
         }
         IpcRequest::Say { text } if text.trim().is_empty() || text.len() > 512 => {
             return Err("speech bubble text must be 1..=512 bytes".to_owned());
+        }
+        IpcRequest::Chat { prompt } if prompt.trim().is_empty() || prompt.len() > 2048 => {
+            return Err("chat prompt must be 1..=2048 bytes".to_owned());
         }
         IpcRequest::Layer { mode }
             if !mode.eq_ignore_ascii_case("top") && !mode.eq_ignore_ascii_case("overlay") =>

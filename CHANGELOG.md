@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [v1.2.0] - 2026-10-27
+
+### Added
+
+- **OpenAI-Compatible AI Chat Integration (`vpet-app::ai`)**:
+  - Implemented background `AiWorker` thread running HTTP chat completions without blocking Wayland presentation or input handling.
+  - Defaults to `http://localhost:20128/v1` with model `9routerall` (also compatible with Ollama, LM Studio, DeepSeek, and OpenAI).
+  - Handles both standard JSON and Server-Sent Events (SSE `text/event-stream`) streaming chunk aggregation.
+  - Added CLI `vpet-rs ctl chat "<prompt>"` and `vpet-rs ctl prompt-chat`.
+  - Added StatusNotifierItem tray menu item `"Chat with Pet..."` with desktop prompt fallback (`fuzzel`, `zenity`, or `kdialog`).
+  - Integrated speech bubble replies with `Say` animation transitions and likability, feeling, and experience rewards.
+
 ## [v1.1.0] - 2026-10-27
 
 ### Added

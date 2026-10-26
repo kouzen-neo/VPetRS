@@ -14,6 +14,7 @@ pub enum TrayCommand {
     FeedSnack,
     StartWork(String),
     CancelWork,
+    PromptAiChat,
     ReloadConfig,
     Quit,
 }
@@ -27,6 +28,7 @@ pub struct TraySnapshot {
     pub sleeping: bool,
     pub active_work: Option<(String, u32)>,
     pub available_works: Vec<(String, u32)>,
+    pub ai_enabled: bool,
 }
 
 impl Default for TraySnapshot {
@@ -39,6 +41,7 @@ impl Default for TraySnapshot {
             sleeping: false,
             active_work: None,
             available_works: Vec::new(),
+            ai_enabled: true,
         }
     }
 }
@@ -173,6 +176,19 @@ impl ksni::Tray for VPetTray {
                 SubMenu {
                     label: "Work / Study / Play".to_owned(),
                     submenu: sub_items,
+                    ..Default::default()
+                }
+                .into(),
+            );
+        }
+
+        if self.snap.ai_enabled {
+            items.push(
+                StandardItem {
+                    label: "Chat with Pet...".to_owned(),
+                    activate: Box::new(|this: &mut Self| {
+                        let _ = this.tx.send(TrayCommand::PromptAiChat);
+                    }),
                     ..Default::default()
                 }
                 .into(),

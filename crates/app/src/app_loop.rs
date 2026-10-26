@@ -61,6 +61,7 @@ struct RuntimeState {
     anim: InteractionController,
     shell: WaylandShell,
     tray: Option<TrayController>,
+    ai_worker: crate::ai::AiWorker,
 
     last_clip_key: String,
     last_frame_idx: usize,
@@ -98,6 +99,7 @@ impl RuntimeState {
                 sleeping: self.world.pet.sleeping,
                 active_work,
                 available_works,
+                ai_enabled: self.config.ai.enabled,
             });
         }
     }
@@ -112,6 +114,9 @@ impl RuntimeState {
         self.shell.set_click_through(next.display.click_through);
         if self.config.display.output != next.display.output {
             let _ = self.shell.select_output(next.display.preferred_output());
+        }
+        if self.config.ai != next.ai {
+            self.ai_worker = crate::ai::AiWorker::spawn(next.ai.clone());
         }
         self.config = next;
         self.shell.present();
@@ -236,6 +241,8 @@ impl RuntimeState {
             mode: self.world.pet.mode.as_str().to_owned(),
             sleeping: self.world.pet.sleeping,
             active_work: self.world.active_work.as_ref().map(|w| w.name.clone()),
+            ai_enabled: self.config.ai.enabled,
+            ai_model: self.config.ai.model.clone(),
             visible: self.shell.visible(),
             click_through: self.shell.click_through(),
             layer: self.shell.layer_mode().as_str().to_owned(),
@@ -309,6 +316,31 @@ impl RuntimeState {
                 self.refresh_visuals();
                 self.shell.present();
                 IpcResponse::success(serde_json::json!({ "speaking": true }))
+            }
+            IpcRequest::Chat { prompt } => {
+                if !self.config.ai.enabled {
+                    return IpcResponse::fail("AI chat is disabled in config.toml [ai]");
+                }
+                self.anim.show_bubble("...", 8_000);
+                self.anim.request_state(
+                    crate::anim::ActionState::Saying,
+                    false,
+                    &self.anim_index,
+                    &mut self.world,
+                );
+                self.refresh_visuals();
+                self.shell.present();
+                if self.ai_worker.ask(&prompt) {
+                    IpcResponse::success(
+                        serde_json::json!({ "status": "thinking", "prompt": prompt }),
+                    )
+                } else {
+                    IpcResponse::fail("failed to dispatch prompt to AI worker")
+                }
+            }
+            IpcRequest::PromptInput => {
+                spawn_desktop_input_prompt(&self.paths.socket_path);
+                IpcResponse::success(serde_json::json!({ "prompt_spawned": true }))
             }
             IpcRequest::Work { name } => {
                 if let Some(n) = name.filter(|s| !s.trim().is_empty()) {
@@ -401,6 +433,9 @@ impl RuntimeState {
                 let _ = self.cancel_active_work();
                 self.refresh_visuals();
                 self.shell.present();
+            }
+            TrayCommand::PromptAiChat => {
+                spawn_desktop_input_prompt(&self.paths.socket_path);
             }
             TrayCommand::ReloadConfig => {
                 let next = AppConfig::load_or_default(&self.paths.config_file);
@@ -608,6 +643,7 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
                     .iter()
                     .map(|w| (w.name.clone(), w.level_limit))
                     .collect(),
+                ai_enabled: config.ai.enabled,
             },
             tray_tx,
         )
@@ -732,6 +768,36 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
                 }
             }
 
+            if let Some(res) = state.ai_worker.poll_reply() {
+                match res.reply {
+                    Ok(text) => {
+                        state.world.pet.add_feeling(2.5);
+                        state.world.pet.add_likability(0.8);
+                        let _ = state.world.pet.add_exp(2.0);
+                        state.anim.show_bubble(text, 8_000);
+                        state.anim.request_state(
+                            crate::anim::ActionState::Saying,
+                            true,
+                            &state.anim_index,
+                            &mut state.world,
+                        );
+                    }
+                    Err(err) => {
+                        warn!(%err, "AI chat query failed");
+                        state.anim.show_bubble(format!("Hmm? ({err})"), 4_500);
+                        state.anim.request_state(
+                            crate::anim::ActionState::Idle,
+                            true,
+                            &state.anim_index,
+                            &mut state.world,
+                        );
+                    }
+                }
+                state.sync_tray();
+                state.refresh_visuals();
+                state.shell.present();
+            }
+
             let mut pos = state.shell.position();
             let out_name = state.shell.active_output_name().to_owned();
             let bounds = state.shell.output_logical_size();
@@ -781,6 +847,7 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
     );
 
     let watcher = ConfigWatcher::new(paths.config_file.clone());
+    let ai_worker = crate::ai::AiWorker::spawn(config.ai.clone());
     let mut state = RuntimeState {
         paths,
         config,
@@ -800,6 +867,7 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
         anim,
         shell,
         tray,
+        ai_worker,
         last_clip_key: String::new(),
         last_frame_idx: usize::MAX,
         last_bubble: None,
@@ -890,4 +958,52 @@ fn unix_now() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |d| d.as_secs() as i64)
+}
+
+fn spawn_desktop_input_prompt(socket_path: &std::path::Path) {
+    let sock = socket_path.to_path_buf();
+    std::thread::spawn(move || {
+        let text_opt = if let Ok(out) = std::process::Command::new("fuzzel")
+            .args(["-d", "-p", "Chat with Loris: "])
+            .output()
+        {
+            if out.status.success() {
+                Some(String::from_utf8_lossy(&out.stdout).trim().to_owned())
+            } else {
+                None
+            }
+        } else if let Ok(out) = std::process::Command::new("zenity")
+            .args([
+                "--entry",
+                "--title",
+                "VPetRS AI Chat",
+                "--text",
+                "Say something to Loris:",
+            ])
+            .output()
+        {
+            if out.status.success() {
+                Some(String::from_utf8_lossy(&out.stdout).trim().to_owned())
+            } else {
+                None
+            }
+        } else if let Ok(out) = std::process::Command::new("kdialog")
+            .args(["--inputbox", "Say something to Loris:"])
+            .output()
+        {
+            if out.status.success() {
+                Some(String::from_utf8_lossy(&out.stdout).trim().to_owned())
+            } else {
+                None
+            }
+        } else {
+            warn!("no supported desktop input prompter found (fuzzel, zenity, or kdialog)");
+            None
+        };
+
+        if let Some(msg) = text_opt.filter(|s| !s.is_empty()) {
+            let req = crate::ipc::IpcRequest::Chat { prompt: msg };
+            let _ = crate::ipc::send_ipc_request(&sock, &req);
+        }
+    });
 }

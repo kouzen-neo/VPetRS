@@ -51,7 +51,7 @@ Tag anotasi dibuat di akhir fase sesuai tabel commit map (§3). Pesan tag:
 | 6 | Integrasi app (config, IPC, tray) | `[x]` selesai | `v0.6.0` |
 | 7 | Packaging & dokumentasi | `[x]` selesai | `v0.7.0` |
 | 8 | MVP hardening | `[x]` selesai | `v1.0.0` |
-| 9 | Post-MVP (work/study/play, save import, theme styling) | `[x]` selesai | `v1.1.0` |
+| 9 | Post-MVP (work, save import, theme styling, AI chat) | `[x]` selesai | `v1.2.0` |
 
 Legenda status: `[ ]` belum, `[~]` dikerjakan, `[x]` selesai, `[!]` terblokir.
 
@@ -258,6 +258,7 @@ menghormati alpha, (3) click-through bekerja, (4) surface tidak merebut fokus �
 
 ## 13. Fase 9 — Post-MVP
 
+- [x] AI Chat (`vpet-app::ai`): endpoint OpenAI/Ollama/LM Studio/9router (`http://localhost:20128/v1`, model `9routerall`), background worker thread, SSE streaming + JSON parsing, CLI `vpet-rs ctl chat`, dan menu Tray "Chat with Pet...".
 - [x] Work / study / play (`Copywriting`, `Study`, `Gaming`, `Barbecue`, dll.) + Tray submenu + CLI (`vpet-rs ctl works`, `work`, `cancel-work`).
 - [x] Import save VPet legacy (`.lps` -> atomic `.mpak`) via `vpet-rs import-save <Save.lps>`.
 - [x] Pewarnaan chat bubble mengikuti `ThemeDef` (`Primary`, `PrimaryLighter`, `PrimaryText`).

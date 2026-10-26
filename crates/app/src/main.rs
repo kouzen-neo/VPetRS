@@ -1,5 +1,6 @@
 //! VPetRust CLI and Wayland layer-shell desktop pet entrypoint.
 
+pub mod ai;
 pub mod anim;
 pub mod app_loop;
 pub mod config;
@@ -114,6 +115,10 @@ enum CtlAction {
     Wake,
     /// Display a speech bubble above the pet
     Say { text: String },
+    /// Chat with the pet via AI LLM (Ollama, LM Studio, DeepSeek, OpenAI)
+    Chat { prompt: String },
+    /// Open a desktop input prompter (fuzzel, zenity, or kdialog) to chat with the pet
+    PromptChat,
     /// List available work, study, and play tasks
     Works,
     /// Start a work, study, or play task by name (or first available if omitted)
@@ -188,6 +193,8 @@ fn try_main() -> Result<()> {
                 CtlAction::Sleep => IpcRequest::Sleep,
                 CtlAction::Wake => IpcRequest::Wake,
                 CtlAction::Say { text } => IpcRequest::Say { text },
+                CtlAction::Chat { prompt } => IpcRequest::Chat { prompt },
+                CtlAction::PromptChat => IpcRequest::PromptInput,
                 CtlAction::Works => IpcRequest::Work { name: None },
                 CtlAction::Work { name } => {
                     let opt = if name.trim().is_empty() {

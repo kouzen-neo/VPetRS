@@ -35,6 +35,7 @@ VPetRS renders on `zwlr_layer_surface_v1` instead, which fixes all four:
 - **VPet content compatibility:** LinePutScript parser and a `PetLoader` / `GraphInfo`-compatible animation indexer. Supports `A_Start -> B_Loop -> C_End` chains, `Single`, `FoodAnimation`, APNG, and GIF. Content is localized to English through `lang/en/*.lps`.
 - **Interactions:** head/body touch hit zones from `vup.lps`, drag-to-raise, sleep/wake, auto-walk with screen-edge bounce, and speech bubbles shaped with `cosmic-text`.
 - **Simulation:** a deterministic 10 Hz core that follows the `GameSave_VPet` formulas (stat caps, leveling, digestion, condition modes), plus feeding, inventory, and timed buffs.
+- **AI Chat (LLM):** background AI worker compatible with OpenAI, Ollama, LM Studio, and DeepSeek endpoints (defaults to `http://localhost:20128/v1` with model `9routerall`), supporting both standard JSON and streaming SSE chunks with speech bubble replies.
 - **Crash-safe saves:** MessagePack save files written atomically (`fsync` + rename) with 5 rotating backups and automatic recovery from a corrupt save.
 - **Desktop integration:** StatusNotifierItem tray icon (shows in `waybar`), live TOML config reload, and a Unix-socket IPC CLI (`vpet-rs ctl`, socket mode `0600`, `SO_PEERCRED` check).
 - **Lightweight:** an 8.2 MiB stripped native ELF that links only `libwayland-client`, `libc`, `libm`, and `libffi`. Measured at about **0.7% of one CPU core** and **about 60 MiB RSS** on a 1920x1080 niri output.
@@ -106,6 +107,8 @@ vpet-rs ctl status                      # stats, mode, layer, output, position (
 vpet-rs ctl toggle-clickthrough         # toggle click-through
 vpet-rs ctl layer overlay               # switch between `top` and `overlay`
 vpet-rs ctl feed "Fruit Juice"          # feed an item from the food database
+vpet-rs ctl chat "Hello Loris! How are you?" # chat with pet via AI LLM
+vpet-rs ctl prompt-chat                 # open desktop prompt dialog to chat
 vpet-rs ctl works                       # list all work/study/play tasks
 vpet-rs ctl work "Copywriting"          # start working
 vpet-rs ctl cancel-work                 # cancel active work
