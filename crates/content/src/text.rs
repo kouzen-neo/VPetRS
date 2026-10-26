@@ -1,9 +1,12 @@
-//! Dialogue and low-stat alert text databases (`text/*.lps`).
+//! Dialogue and low-stat alert text databases (`text/*.lps`) with English localization.
 
 use serde::{Deserialize, Serialize};
 use vpet_core::ModeType;
 
-use crate::lps::LpsDocument;
+use crate::{
+    lang::{LangTable, clean_localized_text, contains_cjk},
+    lps::LpsDocument,
+};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ClickTextEntry {
@@ -64,6 +67,31 @@ impl TextDatabase {
                     strength_low: tag == "lowfoodtext",
                 });
             }
+        }
+    }
+
+    /// Translate dialogue and low-stat alert strings into `locale`, removing any untranslated
+    /// CJK lines when targeting English (`"en"`).
+    pub fn localize(&mut self, lang: &LangTable, locale: &str) {
+        let enforce_non_cjk = locale.to_ascii_lowercase().starts_with("en");
+
+        for entry in &mut self.click_texts {
+            entry.text = clean_localized_text(lang.translate(locale, &entry.text));
+            if let Some(w) = &entry.working {
+                entry.working = Some(clean_localized_text(lang.translate(locale, w)));
+            }
+        }
+        if enforce_non_cjk {
+            self.click_texts
+                .retain(|e| !e.text.is_empty() && !contains_cjk(&e.text));
+        }
+
+        for entry in &mut self.low_texts {
+            entry.text = clean_localized_text(lang.translate(locale, &entry.text));
+        }
+        if enforce_non_cjk {
+            self.low_texts
+                .retain(|e| !e.text.is_empty() && !contains_cjk(&e.text));
         }
     }
 

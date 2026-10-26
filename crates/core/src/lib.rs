@@ -143,7 +143,7 @@ mod tests {
     #[test]
     fn save_roundtrip_and_version_migration() {
         let mut world = World::new("slot1", "Loris", 999);
-        world.inventory.add("果汁", 3);
+        world.inventory.add("Fruit Juice", 3);
         world
             .output_positions
             .insert("eDP-1".to_owned(), (240, 760));
@@ -155,7 +155,7 @@ mod tests {
         assert_eq!(save, decoded);
 
         let restored = decoded.into_world();
-        assert_eq!(restored.inventory.count("果汁"), 3);
+        assert_eq!(restored.inventory.count("Fruit Juice"), 3);
         assert_eq!(restored.output_positions.get("eDP-1"), Some(&(240, 760)));
 
         // Legacy v0 migrates to v1; future v99 is rejected safely.

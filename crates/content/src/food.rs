@@ -1,10 +1,13 @@
-//! Food and consumable item database loaded from `food/*.lps`.
+//! Food and consumable item database loaded from `food/*.lps` with English localization.
 
 use std::{collections::BTreeMap, path::Path, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use crate::lps::LpsDocument;
+use crate::{
+    lang::{LangTable, clean_localized_text, contains_cjk},
+    lps::LpsDocument,
+};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FoodItem {
@@ -60,8 +63,28 @@ impl FoodDatabase {
                 buff_time_mins: line.get_u32("BuffTime").unwrap_or(0),
                 image_path,
             };
-            // Mod override rule: later mod with identical food name replaces earlier definition.
             self.items.insert(name.to_lowercase(), item);
+        }
+    }
+
+    /// Translate food names and descriptions using `lang` (`"en"` strips untranslated CJK items).
+    pub fn localize(&mut self, lang: &LangTable, locale: &str) {
+        let enforce_non_cjk = locale.to_ascii_lowercase().starts_with("en");
+        let old_items = std::mem::take(&mut self.items);
+        for (_, mut item) in old_items {
+            let trans_name = clean_localized_text(lang.translate(locale, &item.name));
+            let trans_desc = clean_localized_text(lang.translate(locale, &item.desc));
+
+            if enforce_non_cjk && contains_cjk(&trans_name) {
+                continue;
+            }
+            item.name = trans_name;
+            item.desc = if enforce_non_cjk && contains_cjk(&trans_desc) {
+                String::new()
+            } else {
+                trans_desc
+            };
+            self.items.insert(item.name.to_lowercase(), item);
         }
     }
 

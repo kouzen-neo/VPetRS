@@ -10,7 +10,10 @@ use serde::{Deserialize, Serialize};
 use tracing::warn;
 use vpet_core::ModeType;
 
-use crate::lps::{LpsDocument, LpsLine};
+use crate::{
+    lang::{LangTable, clean_localized_text, contains_cjk},
+    lps::{LpsDocument, LpsLine},
+};
 
 /// Animation categories in exact VPet `GraphInfo.GraphType` priority order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -461,6 +464,32 @@ impl PetConfig {
         }
 
         cfg
+    }
+
+    pub fn localize(&mut self, lang: &LangTable, locale: &str) {
+        let enforce_non_cjk = locale.to_ascii_lowercase().starts_with("en");
+        let name = clean_localized_text(lang.translate(locale, &self.pet_name));
+        self.pet_name = if enforce_non_cjk && contains_cjk(&name) {
+            "Loris".to_owned()
+        } else {
+            name
+        };
+
+        let intro = clean_localized_text(lang.translate(locale, &self.intro));
+        self.intro = if enforce_non_cjk && contains_cjk(&intro) {
+            "Default virtual desktop pet".to_owned()
+        } else {
+            intro
+        };
+
+        for work in &mut self.works {
+            let wname = clean_localized_text(lang.translate(locale, &work.name));
+            work.name = if enforce_non_cjk && contains_cjk(&wname) {
+                work.graph.clone()
+            } else {
+                wname
+            };
+        }
     }
 }
 
@@ -980,7 +1009,7 @@ pub fn parse_frame_duration_ms(path: &Path) -> u32 {
         .max(16)
 }
 
-/// Natural filename comparison (`_2_` < `_10_`, `循环A_002` < `循环A_010`).
+/// Natural filename comparison (`_2_` < `_10_`, `loopA_002` < `loopA_010`).
 #[must_use]
 pub fn natural_cmp(a: &str, b: &str) -> Ordering {
     let mut ca = a.chars().peekable();
@@ -1034,11 +1063,11 @@ mod tests {
 
     #[test]
     fn natural_sort_orders_numeric_frame_indices() {
-        let mut names = vec!["循环_010_125.png", "循环_002_125.png", "循环_000_250.png"];
+        let mut names = vec!["loop_010_125.png", "loop_002_125.png", "loop_000_250.png"];
         names.sort_by(|a, b| natural_cmp(a, b));
         assert_eq!(
             names,
-            vec!["循环_000_250.png", "循环_002_125.png", "循环_010_125.png"]
+            vec!["loop_000_250.png", "loop_002_125.png", "loop_010_125.png"]
         );
         assert_eq!(parse_frame_duration_ms(Path::new("_003_375.png")), 375);
         assert_eq!(parse_frame_duration_ms(Path::new("static.png")), 125);

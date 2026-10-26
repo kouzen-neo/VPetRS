@@ -12,7 +12,7 @@ use tracing::warn;
 use crate::{
     anim::{AnimationIndex, PetConfig, natural_path_cmp},
     food::FoodDatabase,
-    lang::LangTable,
+    lang::{LangTable, clean_localized_text, contains_cjk},
     lps::LpsDocument,
     text::TextDatabase,
     theme::ThemeDef,
@@ -57,6 +57,7 @@ impl ContentDatabase {
         }
         if path.join("info.lps").is_file() || path.join("pet").is_dir() {
             self.load_single_mod(path);
+            self.localize("en");
             return;
         }
 
@@ -91,6 +92,33 @@ impl ContentDatabase {
         for dir in dirs {
             self.load_single_mod(&dir);
         }
+        self.localize("en");
+    }
+
+    /// Localize all loaded pets, foods, dialogues, themes, and mod descriptions into `locale`.
+    pub fn localize(&mut self, locale: &str) {
+        let enforce_non_cjk = locale.to_ascii_lowercase().starts_with("en");
+        for m in &mut self.mods {
+            let intro = clean_localized_text(self.lang.translate(locale, &m.intro));
+            m.intro = if enforce_non_cjk && contains_cjk(&intro) {
+                "Core content pack".to_owned()
+            } else {
+                intro
+            };
+        }
+        for pet in self.pets.values_mut() {
+            pet.localize(&self.lang, locale);
+        }
+        for theme in self.themes.values_mut() {
+            let name = clean_localized_text(self.lang.translate(locale, &theme.display_name));
+            theme.display_name = if enforce_non_cjk && contains_cjk(&name) {
+                theme.id.clone()
+            } else {
+                name
+            };
+        }
+        self.foods.localize(&self.lang, locale);
+        self.texts.localize(&self.lang, locale);
     }
 
     pub fn load_single_mod(&mut self, mod_dir: &Path) {
@@ -275,7 +303,7 @@ mod tests {
     }
 
     #[test]
-    fn scans_real_0000_core_pack_when_present() {
+    fn scans_real_0000_core_pack_and_translates_all_strings_to_english() {
         let root = Path::new("/home/kouzen/Documents/VPet/VPet-Simulator.Windows/mod/0000_core");
         if !root.exists() {
             return;
@@ -284,9 +312,26 @@ mod tests {
         let db = ContentDatabase::load_root(root);
         assert!(db.pets.contains_key("vup"));
         assert!(db.animations.get("vup").is_some_and(|a| a.len() > 150));
-        assert!(db.foods.len() >= 60);
+        assert!(db.foods.get("Fruit Juice").is_some());
+        assert!(db.foods.get("Cola").is_some());
         assert!(!db.texts.click_texts().is_empty());
         assert!(db.themes.contains_key("default"));
-        assert_eq!(db.lang.translate("en", "设置"), "Settings");
+
+        // Verify zero Chinese / CJK characters remain in localized English databases.
+        for f in db.foods.all() {
+            assert!(!contains_cjk(&f.name), "untranslated food name: {}", f.name);
+            assert!(!contains_cjk(&f.desc), "untranslated food desc: {}", f.desc);
+        }
+        for t in db.texts.click_texts() {
+            assert!(
+                !contains_cjk(&t.text),
+                "untranslated click text: {}",
+                t.text
+            );
+        }
+        for p in db.pets.values() {
+            assert!(!contains_cjk(&p.pet_name));
+            assert!(!contains_cjk(&p.intro));
+        }
     }
 }

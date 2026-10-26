@@ -32,7 +32,7 @@ vpet-rs                                # Start layer-shell pet daemon
 vpet-rs ctl status                     # Inspect stats, mode, layer, output, position
 vpet-rs ctl toggle-clickthrough        # Toggle mouse click-through
 vpet-rs ctl layer overlay              # Switch between `top` and `overlay`
-vpet-rs ctl feed "果汁"                # Feed an item from 0000_core/food
+vpet-rs ctl feed "Fruit Juice"         # Feed an item from 0000_core/food
 vpet-rs ctl say "Hello niri!"          # Render a speech bubble
 vpet-rs ctl sleep                      # Put pet to sleep (or `wake`)
 vpet-rs ctl reload                     # Hot-reload config.toml

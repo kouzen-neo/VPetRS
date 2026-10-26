@@ -14,7 +14,7 @@ pub use anim::{
     natural_path_cmp, parse_frame_duration_ms,
 };
 pub use food::{FoodDatabase, FoodItem};
-pub use lang::LangTable;
+pub use lang::{LangTable, clean_localized_text, contains_cjk};
 pub use lps::{LpsDocument, LpsError, LpsLine, LpsSub, unescape_lps};
 pub use scan::{ContentDatabase, ModMetadata};
 pub use text::{ClickTextEntry, LowTextEntry, TextDatabase};

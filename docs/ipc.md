@@ -18,7 +18,7 @@ vpet-rs ctl toggle-clickthrough        # Toggle empty wl_region click-through
 vpet-rs ctl show                       # Show pet surface
 vpet-rs ctl hide                       # Hide pet surface and clear input region
 vpet-rs ctl layer overlay              # Switch between `top` and `overlay`
-vpet-rs ctl feed "果汁"                # Feed specific item (or `snack` for default)
+vpet-rs ctl feed "Fruit Juice"         # Feed specific item (or `snack` for default)
 vpet-rs ctl sleep                      # Put pet to sleep
 vpet-rs ctl wake                       # Wake pet up
 vpet-rs ctl say "Hello niri!"          # Show a speech bubble above the pet
@@ -35,7 +35,7 @@ Requests:
 {"cmd":"show"}
 {"cmd":"hide"}
 {"cmd":"layer","mode":"overlay"}
-{"cmd":"feed","item":"果汁"}
+{"cmd":"feed","item":"Fruit Juice"}
 {"cmd":"sleep"}
 {"cmd":"wake"}
 {"cmd":"say","text":"Hello!"}

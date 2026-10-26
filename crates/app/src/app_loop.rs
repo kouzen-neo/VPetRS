@@ -337,7 +337,8 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
     let content_root = paths.resolve_content_root(&config.app.content_root);
     let mut mod_loader = ModLoader::new(&content_root);
     mod_loader.add_mod_root(&paths.mods_dir);
-    let content = mod_loader.load_all();
+    let mut content = mod_loader.load_all();
+    content.localize(&config.pet.locale);
 
     let pet_cfg = content
         .pets

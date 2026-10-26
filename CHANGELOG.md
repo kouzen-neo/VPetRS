@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [v1.0.1] - 2026-10-27
+
+### Fixed
+
+- **Complete English Localization for VPet Content (`vpet-content`)**:
+  - Localized all loaded `ClickText`, `LowText`, `FoodDatabase` names and descriptions, `PetConfig` metadata, `WorkDef` labels, and `ThemeDef` names through `lang/en/*.lps` during content pack loading.
+  - Filtered out untranslated CJK strings and sanitized `{hostname}` / `/id` placeholders when running in English locale (`"en"`) so speech bubbles, tray labels, and CLI commands (`vpet-rs ctl feed "Fruit Juice"`) display strictly in English.
+
 ## [v1.0.0] - 2026-10-27
 
 ### Added
