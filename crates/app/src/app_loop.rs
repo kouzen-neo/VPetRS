@@ -501,7 +501,14 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
         config.display.output = out;
     }
 
-    let lock = InstanceLock::acquire(&paths.lock_path)?;
+    let lock = match InstanceLock::acquire(&paths.lock_path) {
+        Ok(l) => l,
+        Err(_) => {
+            eprintln!("vpet-rs daemon is already running.");
+            eprintln!("Use `vpet-rs ctl --help` to control it, or `vpet-rs ctl quit` to stop.");
+            return Ok(());
+        }
+    };
     // Bind Unix socket IPC immediately after holding single-instance flock so CLI clients connect right away.
     let ipc_server = IpcServer::bind(&paths.socket_path)?;
     let save_store = SaveStore::new(&paths.saves_dir);
