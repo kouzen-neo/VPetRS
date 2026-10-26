@@ -6,5 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
-vpet-core.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
 vpet-content.workspace = true
+vpet-core.workspace = true

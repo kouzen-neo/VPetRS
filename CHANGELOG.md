@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [v0.2.0] - 2026-10-27
+
+### Added
+
+- **LinePutScript (`.lps`) Parser (`vpet-content`)**:
+  - Implemented `LpsDocument`, `LpsLine`, and `LpsSub` supporting UTF-8 BOM, CRLF/LF, `///` whole-line and inline trailing comments, `:|` and `#` escapes (`/|`, `/#`, `/:`, `\n`, `\r`, `\t`, `\\`), and duplicate sub-key ordering.
+  - Added golden test suite verified directly against `0000_core` (`info.lps`, `pet/vup.lps`, `food/food.lps`, `text/ClickText.lps`, `theme/default.lps`, `lang/en/Base2608.lps`).
+- **VPet Animation Folder Indexer & Pet Metadata**:
+  - Implemented `AnimationIndex` with full `PetLoader.LoadGraph` + `GraphInfo` parity across all 23 `GraphType` variants, `AnimatType` (`Single`, `AStart`, `BLoop`, `CEnd`), `ModeType` bitmasks (`Happy`, `Nomal`, `PoorCondition`, `Ill`), natural frame sorting, `_<ms>.png` duration extraction, and `FoodAnimation` keyframe parsing.
+  - Added `PetConfig` parser for `pet/vup.lps` (`500x500` logical hit boxes `touchhead`, `touchbody`, `pinch`, `touchraised`, `raisepoint`, `work`, and `move` rules).
+- **Content Databases & Mod Scanner (`vpet-content`, `vpet-mods`)**:
+  - Added `FoodDatabase`, `TextDatabase` (`ClickText`, `LowText`), `ThemeDef` (ARGB hex + `.ttf`/`.otf` font discovery), and `LangTable` (`lang/<locale>/*.lps` + `info.lps` localization).
+  - Implemented `ContentDatabase` and `ModLoader` enforcing `0000_core`-first load priority, deterministic mod overrides, non-fatal corrupt-file warnings, and explicit rejection/warning of legacy `.NET` `.dll` plugins.
+  - Added `docs/assets-format.md` documenting LPS grammar, coordinate spaces, animation path resolution, and mod priority rules.
+
 ## [v0.1.0] - 2026-10-27
 
 ### Added

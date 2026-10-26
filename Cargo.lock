@@ -474,6 +474,36 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e1cf6437eb19a8f4a6cc0f7dca544973b0b78843adbfeb3683d1a94a0024a294"
 
 [[package]]
+name = "serde"
+version = "1.0.229"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4148590afebada386688f18773da617792bf2ef03ffc1e4cbd2b1d45b023e0ba"
+dependencies = [
+ "serde_core",
+ "serde_derive",
+]
+
+[[package]]
+name = "serde_core"
+version = "1.0.229"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "67dca2c9c51e58a4791a4b1ed58308b39c64224d349a935ab5039aa360942a48"
+dependencies = [
+ "serde_derive",
+]
+
+[[package]]
+name = "serde_derive"
+version = "1.0.229"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7a5d71263a5a7d47b41f6b3f06ba276f10cc18b0931f1799f710578e2309348"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 3.0.9",
+]
+
+[[package]]
 name = "sharded-slab"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -684,7 +714,7 @@ checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
 
 [[package]]
 name = "vpet-app"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "calloop",
@@ -699,26 +729,34 @@ dependencies = [
 
 [[package]]
 name = "vpet-content"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
+ "serde",
+ "thiserror",
+ "tracing",
  "vpet-core",
 ]
 
 [[package]]
 name = "vpet-core"
-version = "0.1.0"
+version = "0.2.0"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "vpet-mods"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
+ "thiserror",
+ "tracing",
  "vpet-content",
  "vpet-core",
 ]
 
 [[package]]
 name = "vpet-render"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "image",
  "thiserror",
@@ -727,11 +765,11 @@ dependencies = [
 
 [[package]]
 name = "vpet-steam"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "vpet-wayland"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "calloop",
  "calloop-wayland-source",

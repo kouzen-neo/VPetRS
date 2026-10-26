@@ -4,7 +4,7 @@ Dokumen ini adalah **papan kerja** proyek. `IMPLEMENTATION.md` menjelaskan *apa*
 *mengapa*; dokumen ini menjelaskan *urutan*, *kriteria selesai*, dan *commit* untuk
 setiap langkah.
 
-**Status:** Fase 1 (Gate 0) selesai (`v0.1.0`). Fase 2 siap dimulai.
+**Status:** Fase 2 selesai (`v0.2.0`). Fase 3 siap dimulai.
 **Terakhir diperbarui:** 2026-10-27
 
 ---
@@ -44,7 +44,7 @@ Tag anotasi dibuat di akhir fase sesuai tabel commit map (§3). Pesan tag:
 |---|---|---|---|
 | 0 | Bootstrap repo & workspace | `[x]` selesai | `v0.0.1` |
 | 1 | Gate 0 — spike layer-shell niri | `[x]` selesai | `v0.1.0` |
-| 2 | Content layer (LPS, index animasi, mod) | `[ ]` belum | `v0.2.0` |
+| 2 | Content layer (LPS, index animasi, mod) | `[x]` selesai | `v0.2.0` |
 | 3 | Renderer & animation player | `[ ]` belum | `v0.3.0` |
 | 4 | Simulasi core & save | `[ ]` belum | `v0.4.0` |
 | 5 | Interaksi & state machine | `[ ]` belum | `v0.5.0` |
@@ -164,16 +164,16 @@ menghormati alpha, (3) click-through bekerja, (4) surface tidak merebut fokus �
 
 ## 6. Fase 2 — Content layer
 
-- [ ] Parser LPS: BOM, CRLF, `|`, `#`, `:`, escape, duplikat, urutan.
-- [ ] Golden test memakai file asli: `info.lps`, `pet/vup.lps`, `food/food.lps`,
+- [x] Parser LPS: BOM, CRLF, `|`, `#`, `:`, escape, duplikat, urutan.
+- [x] Golden test memakai file asli: `info.lps`, `pet/vup.lps`, `food/food.lps`,
       `text/ClickText.lps`, `theme/default.lps`, `lang/en/*.lps`.
-- [ ] Index animasi: `GraphType`, `AnimatType` (A/B/C), `ModeType`, varian, prioritas
+- [x] Index animasi: `GraphType`, `AnimatType` (A/B/C), `ModeType`, varian, prioritas
       path; cocokkan dengan isi `mod/0000_core/pet/vup`.
-- [ ] Scanner mod: `0000_core` dulu, lalu folder lain urut nama; aturan override.
-- [ ] Database: food, text, theme, lang.
-- [ ] Toleransi data rusak: file gagal parse dicatat, tidak mematikan app.
-- [ ] `docs/assets-format.md`.
-- [ ] Unit test untuk tiap modul; tidak ada I/O jaringan.
+- [x] Scanner mod: `0000_core` dulu, lalu folder lain urut nama; aturan override.
+- [x] Database: food, text, theme, lang.
+- [x] Toleransi data rusak: file gagal parse dicatat, tidak mematikan app.
+- [x] `docs/assets-format.md`.
+- [x] Unit test untuk tiap modul; tidak ada I/O jaringan.
 
 ---
 
