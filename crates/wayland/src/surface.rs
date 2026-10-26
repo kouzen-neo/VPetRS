@@ -27,7 +27,7 @@ use smithay_client_toolkit::{
 };
 use thiserror::Error;
 use tracing::{debug, info, warn};
-use vpet_render::Pixmap;
+use vpet_render::{Pixmap, compose_pet_and_bubble};
 use wayland_client::{
     Connection, QueueHandle,
     globals::{BindError, GlobalError, registry_queue_init},
@@ -173,6 +173,7 @@ pub struct WaylandShell {
     closed: bool,
 
     sprite: Pixmap,
+    bubble: Option<Pixmap>,
     pet_pos: (i32, i32),
     needs_redraw: bool,
     needs_region_update: bool,
@@ -230,6 +231,7 @@ impl WaylandShell {
             configured: false,
             closed: false,
             sprite: initial_sprite,
+            bubble: None,
             pet_pos,
             needs_redraw: true,
             needs_region_update: true,
@@ -368,6 +370,14 @@ impl WaylandShell {
         self.sprite = pixmap;
         self.needs_redraw = true;
         self.needs_region_update = true;
+    }
+
+    pub fn set_bubble(&mut self, bubble: Option<Pixmap>) {
+        let changed = self.bubble.is_some() != bubble.is_some() || bubble.is_some();
+        self.bubble = bubble;
+        if changed {
+            self.needs_redraw = true;
+        }
     }
 
     pub fn set_position(&mut self, x: i32, y: i32) {
@@ -512,9 +522,24 @@ impl WaylandShell {
         wl_surface.set_buffer_scale(scale);
         self.apply_input_region(&wl_surface);
 
-        let dst_x = self.pet_pos.0.saturating_mul(scale);
-        let dst_y = self.pet_pos.1.saturating_mul(scale);
-        let sprite_arg = self.config.visible.then_some((&self.sprite, dst_x, dst_y));
+        let composed_scene;
+        let sprite_arg = if self.config.visible {
+            if self.bubble.is_some() {
+                let (scene, delta) = compose_pet_and_bubble(&self.sprite, self.bubble.as_ref());
+                composed_scene = scene;
+                let dst_x = self.pet_pos.0.saturating_mul(scale) + delta.0;
+                let dst_y = (self.pet_pos.1.saturating_mul(scale) + delta.1).max(0);
+                Some((&composed_scene, dst_x, dst_y))
+            } else {
+                Some((
+                    &self.sprite,
+                    self.pet_pos.0.saturating_mul(scale),
+                    self.pet_pos.1.saturating_mul(scale),
+                ))
+            }
+        } else {
+            None
+        };
 
         let prepared = match self
             .swapchain

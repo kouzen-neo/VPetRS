@@ -4,7 +4,7 @@ Dokumen ini adalah **papan kerja** proyek. `IMPLEMENTATION.md` menjelaskan *apa*
 *mengapa*; dokumen ini menjelaskan *urutan*, *kriteria selesai*, dan *commit* untuk
 setiap langkah.
 
-**Status:** Fase 2 selesai (`v0.2.0`). Fase 3 siap dimulai.
+**Status:** Fase 3 selesai (`v0.3.0`). Fase 4 siap dimulai.
 **Terakhir diperbarui:** 2026-10-27
 
 ---
@@ -45,7 +45,7 @@ Tag anotasi dibuat di akhir fase sesuai tabel commit map (§3). Pesan tag:
 | 0 | Bootstrap repo & workspace | `[x]` selesai | `v0.0.1` |
 | 1 | Gate 0 — spike layer-shell niri | `[x]` selesai | `v0.1.0` |
 | 2 | Content layer (LPS, index animasi, mod) | `[x]` selesai | `v0.2.0` |
-| 3 | Renderer & animation player | `[ ]` belum | `v0.3.0` |
+| 3 | Renderer & animation player | `[x]` selesai | `v0.3.0` |
 | 4 | Simulasi core & save | `[ ]` belum | `v0.4.0` |
 | 5 | Interaksi & state machine | `[ ]` belum | `v0.5.0` |
 | 6 | Integrasi app (config, IPC, tray) | `[ ]` belum | `v0.6.0` |
@@ -179,14 +179,14 @@ menghormati alpha, (3) click-through bekerja, (4) surface tidak merebut fokus �
 
 ## 7. Fase 3 — Renderer & animation player
 
-- [ ] Decoder PNG sequence dengan natural sort; APNG; GIF.
-- [ ] Cache LRU berbasis byte (default 256 MB), bisa dikonfigurasi.
-- [ ] Decode di thread terpisah (`std::thread` + channel), kirim frame siap pakai.
-- [ ] Preload idle/breath/sleep/touch saat startup.
-- [ ] Damage rect union area lama+baru; tidak clear layar penuh per frame.
-- [ ] Teks chat bubble dengan `cosmic-text` + rounded rect.
-- [ ] Snapshot test: render frame → PNG, bandingkan dengan toleransi.
-- [ ] Benchmark kasar: waktu decode dan waktu composite per frame.
+- [x] Decoder PNG sequence dengan natural sort; APNG; GIF.
+- [x] Cache LRU berbasis byte (default 256 MB), bisa dikonfigurasi.
+- [x] Decode di thread terpisah (`std::thread` + channel), kirim frame siap pakai.
+- [x] Preload idle/breath/sleep/touch saat startup.
+- [x] Damage rect union area lama+baru; tidak clear layar penuh per frame.
+- [x] Teks chat bubble dengan `cosmic-text` + rounded rect.
+- [x] Snapshot test: render frame → PNG, bandingkan dengan toleransi.
+- [x] Benchmark kasar: waktu decode dan waktu composite per frame.
 
 ---
 

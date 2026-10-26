@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [v0.3.0] - 2026-10-27
+
+### Added
+
+- **Animation Frame Decoders & Food Layer Compositor (`vpet-render`)**:
+  - Added `decode_png_sequence`, `decode_animated_file` (APNG + GIF frame delays), and `decode_animation_source` scaling sprites into premultiplied `Arc<Pixmap>` clips.
+  - Added `compose_food_animation` compositing VPet 3-layer eating/drinking animations (`back_lay` + translated/scaled/rotated/alpha-faded item icon + `front_lay`).
+- **Byte-Bounded LRU Cache & Background Worker**:
+  - Added `FrameCache` with configurable byte cap (256 MiB default), MRU promotion on hit, and deterministic LRU eviction.
+  - Added `AsyncClipLoader` worker thread (`vpet-decode`) with in-flight request deduplication and startup preloading so disk/PNG decoding never runs inside Wayland `frame` callbacks.
+- **Pure-Rust Chat Bubble Renderer (`cosmic-text` + `tiny-skia`)**:
+  - Implemented `BubbleRenderer` for shaped multi-line text inside anti-aliased rounded speech bubbles with custom `.ttf`/`.otf` font loading.
+  - Integrated `set_bubble` scene composition in `vpet-wayland` while keeping `wl_region` hit-testing strictly bound to the pet silhouette so speech bubbles never block clicks.
+  - Added deterministic PNG snapshot, GIF decode, LRU eviction, and async loader tests.
+
 ## [v0.2.0] - 2026-10-27
 
 ### Added
