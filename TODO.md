@@ -4,8 +4,8 @@ Dokumen ini adalah **papan kerja** proyek. `IMPLEMENTATION.md` menjelaskan *apa*
 *mengapa*; dokumen ini menjelaskan *urutan*, *kriteria selesai*, dan *commit* untuk
 setiap langkah.
 
-**Status:** Fase 0 selesai (`v0.0.1`). Fase 1 (Gate 0) siap dimulai.
-**Terakhir diperbarui:** 2026-10-26
+**Status:** Fase 1 (Gate 0) selesai (`v0.1.0`). Fase 2 siap dimulai.
+**Terakhir diperbarui:** 2026-10-27
 
 ---
 
@@ -43,7 +43,7 @@ Tag anotasi dibuat di akhir fase sesuai tabel commit map (§3). Pesan tag:
 | Fase | Nama | Status | Tag |
 |---|---|---|---|
 | 0 | Bootstrap repo & workspace | `[x]` selesai | `v0.0.1` |
-| 1 | Gate 0 — spike layer-shell niri | `[ ]` belum | `v0.1.0` |
+| 1 | Gate 0 — spike layer-shell niri | `[x]` selesai | `v0.1.0` |
 | 2 | Content layer (LPS, index animasi, mod) | `[ ]` belum | `v0.2.0` |
 | 3 | Renderer & animation player | `[ ]` belum | `v0.3.0` |
 | 4 | Simulasi core & save | `[ ]` belum | `v0.4.0` |
@@ -116,43 +116,43 @@ Legenda status: `[ ]` belum, `[~]` dikerjakan, `[x]` selesai, `[!]` terblokir.
 
 ### Tugas
 
-- [ ] `vpet-wayland`: koneksi `wayland-client` + `calloop` event loop.
-- [ ] Bind global: `wl_compositor`, `wl_shm`, `wl_output`, `wl_seat`,
+- [x] `vpet-wayland`: koneksi `wayland-client` + `calloop` event loop.
+- [x] Bind global: `wl_compositor`, `wl_shm`, `wl_output`, `wl_seat`,
       `zwlr_layer_shell_v1`.
-- [ ] Pilih output dari config/env (`VPET_OUTPUT`), fallback output pertama.
-- [ ] Buat `wl_surface` + `zwlr_layer_surface_v1`:
+- [x] Pilih output dari config/env (`VPET_OUTPUT`), fallback output pertama.
+- [x] Buat `wl_surface` + `zwlr_layer_surface_v1`:
   - namespace `vpet-rs`;
   - layer dari env (`VPET_LAYER=top|overlay`, default `top`);
   - anchor 4 sisi, size `0×0`, `exclusive_zone = -1`;
   - `keyboard_interactivity = none`.
-- [ ] Terima `configure`, buat `SlotPool`, alokasi dua buffer, tangani `release`.
-- [ ] `vpet-render`: gambar satu PNG (dari `VPET_SPRITE`) ke pixmap `tiny-skia`,
+- [x] Terima `configure`, buat `SlotPool`, alokasi dua buffer, tangani `release`.
+- [x] `vpet-render`: gambar satu PNG (dari `VPET_SPRITE`) ke pixmap `tiny-skia`,
       swizzle RGBA→BGRA, salin ke buffer.
-- [ ] Hitung input region dari alpha mask (per-baris, batas < 512 rect).
-- [ ] Toggle click-through lewat sinyal sederhana (env `VPET_CLICKTHROUGH=1` dan
+- [x] Hitung input region dari alpha mask (per-baris, batas < 512 rect).
+- [x] Toggle click-through lewat sinyal sederhana (env `VPET_CLICKTHROUGH=1` dan
       `SIGUSR1`) — IPC penuh menyusul di Fase 6.
-- [ ] Pointer: hover, button, motion; drag memindahkan posisi internal `(x, y)`
+- [x] Pointer: hover, button, motion; drag memindahkan posisi internal `(x, y)`
       dengan implicit grab sampai release.
-- [ ] Frame callback + damage rect area lama/baru; commit hanya saat berubah.
-- [ ] Timer 30 fps untuk animasi gerak sederhana (pet berjalan bolak-balik).
-- [ ] `docs/gate0-report.md`: hasil verifikasi + screenshot + catatan perilaku niri.
+- [x] Frame callback + damage rect area lama/baru; commit hanya saat berubah.
+- [x] Timer 30 fps untuk animasi gerak sederhana (pet berjalan bolak-balik).
+- [x] `docs/gate0-report.md`: hasil verifikasi + screenshot + catatan perilaku niri.
 
 ### Kriteria selesai (checklist Gate 0)
 
-- [ ] Binary start tanpa .NET.
-- [ ] `niri msg layers` menampilkan surface `vpet-rs`.
-- [ ] Surface menutupi output, tidak memesan ruang (`exclusive_zone` negatif).
-- [ ] Sprite tampil di posisi yang benar.
-- [ ] Gerakan 30 fps tidak jitter.
-- [ ] Drag bekerja, termasuk saat kursor keluar dari area sprite.
-- [ ] Klik di luar sprite menembus ke window di bawah.
-- [ ] Click-through toggle bekerja (region kosong).
-- [ ] Hover di atas pet tidak memindahkan fokus keyboard.
-- [ ] Ganti workspace: pet tetap terlihat.
-- [ ] Fullscreen: `top` hilang, `overlay` tetap terlihat.
-- [ ] Overview niri: catat perilaku aktual (terlihat / tidak).
-- [ ] Scale 1 benar; catat hasil uji fractional scale.
-- [ ] CPU idle < 5% satu core, memori < 150 MB.
+- [x] Binary start tanpa .NET.
+- [x] `niri msg layers` menampilkan surface `vpet-rs`.
+- [x] Surface menutupi output, tidak memesan ruang (`exclusive_zone` negatif).
+- [x] Sprite tampil di posisi yang benar.
+- [x] Gerakan 30 fps tidak jitter.
+- [x] Drag bekerja, termasuk saat kursor keluar dari area sprite.
+- [x] Klik di luar sprite menembus ke window di bawah.
+- [x] Click-through toggle bekerja (region kosong).
+- [x] Hover di atas pet tidak memindahkan fokus keyboard.
+- [x] Ganti workspace: pet tetap terlihat.
+- [x] Fullscreen: `top` hilang, `overlay` tetap terlihat.
+- [x] Overview niri: catat perilaku aktual (terlihat / tidak).
+- [x] Scale 1 benar; catat hasil uji fractional scale.
+- [x] CPU idle < 5% satu core, memori < 150 MB.
 
 ### Gate keputusan
 

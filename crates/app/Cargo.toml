@@ -10,8 +10,12 @@ name = "vpet-rs"
 path = "src/main.rs"
 
 [dependencies]
-vpet-core.workspace = true
+anyhow.workspace = true
+calloop.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
 vpet-content.workspace = true
+vpet-core.workspace = true
+vpet-mods.workspace = true
 vpet-render.workspace = true
 vpet-wayland.workspace = true
-vpet-mods.workspace = true

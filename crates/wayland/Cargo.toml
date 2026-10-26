@@ -4,3 +4,14 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+
+[dependencies]
+calloop.workspace = true
+calloop-wayland-source.workspace = true
+smithay-client-toolkit.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+vpet-render.workspace = true
+wayland-client.workspace = true
+wayland-protocols.workspace = true
+wayland-protocols-wlr.workspace = true

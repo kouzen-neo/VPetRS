@@ -19,9 +19,9 @@ default-members = [
 ]
 
 [workspace.package]
-version = "0.0.1"
+version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.89"
 license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
@@ -30,6 +30,25 @@ vpet-content = { path = "crates/content" }
 vpet-render = { path = "crates/render" }
 vpet-wayland = { path = "crates/wayland" }
 vpet-mods = { path = "crates/mods" }
+
+anyhow = "1.0"
+thiserror = "2.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+tiny-skia = "0.12"
+image = { version = "0.25", default-features = false, features = ["png", "gif", "webp"] }
+wayland-client = { version = "0.31", features = ["system"] }
+wayland-protocols = { version = "0.32", features = ["client", "staging"] }
+wayland-protocols-wlr = { version = "0.3", features = ["client"] }
+smithay-client-toolkit = { version = "0.21", default-features = false, features = ["calloop", "system"] }
+calloop = { version = "0.14", features = ["signals"] }
+calloop-wayland-source = "0.4"
+
+[profile.dev]
+debug = 0
+
+[profile.test]
+debug = 0
 
 [profile.release]
 opt-level = 3
