@@ -173,4 +173,38 @@ mod tests {
             Err(SaveError::UnsupportedVersion { found: 99 })
         ));
     }
+
+    #[test]
+    fn soak_24h_simulation_stays_bounded_and_finite() {
+        let mut world = World::new("soak", "Loris", 2026);
+        let meal = FoodEffect {
+            name: "Meal".to_owned(),
+            price: 0.0,
+            exp: 25.0,
+            strength: 50.0,
+            strength_food: 80.0,
+            strength_drink: 80.0,
+            feeling: 30.0,
+            health: 5.0,
+            likability: 1.0,
+            buff_id: Some("Satiety1".to_owned()),
+            buff_time_mins: 5,
+        };
+
+        // 864,000 ticks at 10 Hz = 24 full hours of continuous desktop runtime.
+        for tick in 0..864_000_u64 {
+            let now = 1_800_000_000 + (tick / 10) as i64;
+            if tick.is_multiple_of(36_000) {
+                world.feed(&meal, now).unwrap();
+            }
+            world.tick(0.1, now);
+        }
+
+        assert_eq!(world.statistics.ticks_simulated, 864_000);
+        assert!(world.pet.health.is_finite() && (0.0..=100.0).contains(&world.pet.health));
+        assert!(world.pet.strength.is_finite() && world.pet.strength >= 0.0);
+        assert!(world.pet.strength_food.is_finite() && world.pet.strength_food >= 0.0);
+        assert!(world.pet.strength_drink.is_finite() && world.pet.strength_drink >= 0.0);
+        assert!(world.buffs.len() <= 1);
+    }
 }

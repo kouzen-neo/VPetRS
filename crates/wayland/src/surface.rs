@@ -35,9 +35,12 @@ use wayland_client::{
 };
 
 use crate::{
+    fractional::{
+        FractionalScaleGlobals, SurfaceViewport, logical_to_buffer_coord, logical_to_buffer_dim,
+    },
     input::{PointerTracker, SurfaceEvent},
     output::OutputTracker,
-    region::alpha_mask_rects_scaled,
+    region::alpha_mask_rects_scale120,
     shm::{ShmPoolError, ShmSwapchain},
 };
 
@@ -156,11 +159,13 @@ pub struct WaylandShell {
     shm: Shm,
     output_state: OutputState,
     seat_state: SeatState,
+    fractional_globals: FractionalScaleGlobals,
 
     outputs: OutputTracker,
     active_output: Option<wl_output::WlOutput>,
     active_output_name: String,
     layer_surface: Option<LayerSurface>,
+    surface_viewport: Option<SurfaceViewport>,
     swapchain: Option<ShmSwapchain>,
     themed_pointer: Option<ThemedPointer>,
     pointer_tracker: PointerTracker,
@@ -168,6 +173,7 @@ pub struct WaylandShell {
     config: SurfaceConfig,
     logical_size: (u32, u32),
     scale_factor: i32,
+    scale_120: u32,
     initialized: bool,
     configured: bool,
     closed: bool,
@@ -205,6 +211,7 @@ impl WaylandShell {
         let shm = Shm::bind(&globals, &qh)?;
         let output_state = OutputState::new(&globals, &qh);
         let seat_state = SeatState::new(&globals, &qh);
+        let fractional_globals = FractionalScaleGlobals::bind(&globals, &qh);
         let registry_state = RegistryState::new(&globals);
 
         let pet_pos = config.initial_position;
@@ -217,16 +224,19 @@ impl WaylandShell {
             shm,
             output_state,
             seat_state,
+            fractional_globals,
             outputs: OutputTracker::default(),
             active_output: None,
             active_output_name: "auto".to_owned(),
             layer_surface: None,
+            surface_viewport: None,
             swapchain: None,
             themed_pointer: None,
             pointer_tracker: PointerTracker::default(),
             config,
             logical_size: (1920, 1080),
             scale_factor: 1,
+            scale_120: 120,
             initialized: false,
             configured: false,
             closed: false,
@@ -269,13 +279,16 @@ impl WaylandShell {
             self.active_output_name.clone_from(&desc.name);
             self.logical_size = desc.logical_size;
             self.scale_factor = desc.scale_factor.max(1);
+            self.scale_120 = (self.scale_factor as u32) * 120;
         } else {
             self.active_output_name = "default".to_owned();
             self.scale_factor = 1;
+            self.scale_120 = 120;
         }
         self.active_output = target_wl_output.clone();
 
         let wl_surface = self.compositor.create_surface(qh);
+        self.surface_viewport = Some(self.fractional_globals.attach(&wl_surface, qh));
         // Install an empty input region prior to the initial map commit so transparent space
         // never intercepts pointer events.
         if let Ok(empty) = Region::new(&self.compositor) {
@@ -330,6 +343,31 @@ impl WaylandShell {
         self.scale_factor
     }
 
+    pub const fn scale_120(&self) -> u32 {
+        self.scale_120
+    }
+
+    pub(crate) fn on_preferred_fractional_scale(
+        &mut self,
+        surface: &wl_surface::WlSurface,
+        scale_120: u32,
+        qh: &QueueHandle<Self>,
+    ) {
+        if self
+            .layer_surface
+            .as_ref()
+            .is_some_and(|l| l.wl_surface() == surface)
+        {
+            let clamped = scale_120.max(60);
+            if self.scale_120 != clamped {
+                self.scale_120 = clamped;
+                self.needs_redraw = true;
+                self.needs_region_update = true;
+                self.present_if_needed(qh);
+            }
+        }
+    }
+
     pub const fn position(&self) -> (i32, i32) {
         self.pet_pos
     }
@@ -359,10 +397,10 @@ impl WaylandShell {
     }
 
     pub fn sprite_logical_size(&self) -> (u32, u32) {
-        let s = self.scale_factor.max(1) as u32;
+        let s120 = self.scale_120.max(60);
         (
-            self.sprite.width().div_ceil(s),
-            self.sprite.height().div_ceil(s),
+            ((u64::from(self.sprite.width()) * 120).div_ceil(u64::from(s120)) as u32).max(1),
+            ((u64::from(self.sprite.height()) * 120).div_ceil(u64::from(s120)) as u32).max(1),
         )
     }
 
@@ -459,10 +497,10 @@ impl WaylandShell {
             wl_surface.set_input_region(Some(region.wl_region()));
             self.last_rect_count = 0;
         } else {
-            let rects = alpha_mask_rects_scaled(
+            let rects = alpha_mask_rects_scale120(
                 self.sprite.data(),
                 (self.sprite.width(), self.sprite.height()),
-                self.scale_factor,
+                self.scale_120,
                 self.pet_pos,
                 16,
                 MAX_INPUT_REGION_RECTS,
@@ -499,9 +537,14 @@ impl WaylandShell {
             return;
         }
 
-        let scale = self.scale_factor.max(1);
-        let buf_w = self.logical_size.0.saturating_mul(scale as u32).max(1);
-        let buf_h = self.logical_size.1.saturating_mul(scale as u32).max(1);
+        let s120 = self.scale_120.max(60);
+        let is_fractional = !s120.is_multiple_of(120)
+            && self
+                .surface_viewport
+                .as_ref()
+                .is_some_and(|sv| sv.viewport.is_some());
+        let buf_w = logical_to_buffer_dim(self.logical_size.0, s120).max(1);
+        let buf_h = logical_to_buffer_dim(self.logical_size.1, s120).max(1);
 
         if self.swapchain.is_none() {
             match ShmSwapchain::new(&self.shm, buf_w, buf_h) {
@@ -519,23 +562,39 @@ impl WaylandShell {
             return;
         }
 
-        wl_surface.set_buffer_scale(scale);
+        if is_fractional {
+            wl_surface.set_buffer_scale(1);
+            if let Some(vp) = self
+                .surface_viewport
+                .as_ref()
+                .and_then(|sv| sv.viewport.as_ref())
+            {
+                vp.set_destination(self.logical_size.0 as i32, self.logical_size.1 as i32);
+            }
+        } else {
+            if let Some(vp) = self
+                .surface_viewport
+                .as_ref()
+                .and_then(|sv| sv.viewport.as_ref())
+            {
+                vp.set_destination(-1, -1);
+            }
+            wl_surface.set_buffer_scale((s120 / 120).max(1) as i32);
+        }
         self.apply_input_region(&wl_surface);
 
         let composed_scene;
         let sprite_arg = if self.config.visible {
+            let px_x = logical_to_buffer_coord(self.pet_pos.0, s120);
+            let px_y = logical_to_buffer_coord(self.pet_pos.1, s120);
             if self.bubble.is_some() {
                 let (scene, delta) = compose_pet_and_bubble(&self.sprite, self.bubble.as_ref());
                 composed_scene = scene;
-                let dst_x = self.pet_pos.0.saturating_mul(scale) + delta.0;
-                let dst_y = (self.pet_pos.1.saturating_mul(scale) + delta.1).max(0);
+                let dst_x = px_x + delta.0;
+                let dst_y = (px_y + delta.1).max(0);
                 Some((&composed_scene, dst_x, dst_y))
             } else {
-                Some((
-                    &self.sprite,
-                    self.pet_pos.0.saturating_mul(scale),
-                    self.pet_pos.1.saturating_mul(scale),
-                ))
+                Some((&self.sprite, px_x, px_y))
             }
         } else {
             None
@@ -592,6 +651,9 @@ impl CompositorHandler for WaylandShell {
             let clamped = new_factor.max(1);
             if self.scale_factor != clamped {
                 self.scale_factor = clamped;
+                if self.scale_120.is_multiple_of(120) {
+                    self.scale_120 = (clamped as u32) * 120;
+                }
                 self.needs_redraw = true;
                 self.needs_region_update = true;
                 self.present_if_needed(qh);
@@ -689,6 +751,7 @@ impl OutputHandler for WaylandShell {
         self.outputs.sync_from_state(&self.output_state);
         if self.active_output.as_ref() == Some(&output) {
             warn!("active output disconnected; migrating pet layer surface to fallback output");
+            self.surface_viewport = None;
             self.layer_surface = None;
             self.swapchain = None;
             if !self.outputs.outputs().is_empty() {
@@ -703,6 +766,7 @@ impl LayerShellHandler for WaylandShell {
         self.outputs.sync_from_state(&self.output_state);
         if !self.outputs.outputs().is_empty() {
             warn!("layer surface closed by compositor; attempting recovery on available output");
+            self.surface_viewport = None;
             self.layer_surface = None;
             self.swapchain = None;
             if self.recreate_layer_surface(qh).is_ok() {

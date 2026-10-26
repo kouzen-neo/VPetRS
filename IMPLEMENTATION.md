@@ -1,6 +1,6 @@
 # VPetRust — Rencana Implementasi
 
-**Status:** draft  
+**Status:** implemented (`v1.0.0` MVP)  
 **Target utama:** niri (Wayland, layer-shell)  
 **Prinsip:** 100% Rust. Tidak ada .NET, CoreCLR, Mono, Avalonia, WPF, atau plugin DLL .NET.  
 **Tanggal:** 2026-10-26

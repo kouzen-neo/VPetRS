@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [v1.0.0] - 2026-10-27
+
+### Added
+
+- **Fractional Scaling (`wp_fractional_scale_v1` + `wp_viewporter`)**:
+  - Bound `wp_fractional_scale_manager_v1` and `wp_viewporter` in `vpet-wayland` (`scale_120` fixed-point math) so fractional outputs (such as `125%` and `150%`) render at native physical resolution and map surface-local `wl_region` spans accurately alongside integer scales.
+- **24-Hour Soak Test & Troubleshooting Guide**:
+  - Added `864,000`-tick (`24 h` at `10 Hz`) deterministic soak test verifying bounded stats, finite floating-point math, and buff expiry stability.
+  - Finalized `README.md`, `IMPLEMENTATION.md`, and `docs/troubleshooting.md`.
+
+### Changed
+
+- **Release Profiling & Minimal Native Runtime Footprint**:
+  - Profiled stripped `8.2 MiB` `--release` binary live on `niri` (`1920x1080` `eDP-1` scale `1`): measured **0.67% single-core CPU** and **60.4 MiB RSS** with `621` indexed animations and `151` foods loaded.
+  - Trimmed `packaging/PKGBUILD` runtime dependencies to `wayland`, `gcc-libs`, and `glibc` (`ldd` verified pure-Rust D-Bus and fontconfig parsers).
+
+### Fixed
+
+- **Compositor Close & Output Hotplug Viewport Cleanup**:
+  - Released `wp_viewport` and `wp_fractional_scale_v1` protocol objects cleanly before migrating or recreating layer surfaces on output disconnect.
+
 ## [v0.7.0] - 2026-10-27
 
 ### Added

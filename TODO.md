@@ -4,7 +4,7 @@ Dokumen ini adalah **papan kerja** proyek. `IMPLEMENTATION.md` menjelaskan *apa*
 *mengapa*; dokumen ini menjelaskan *urutan*, *kriteria selesai*, dan *commit* untuk
 setiap langkah.
 
-**Status:** Fase 7 selesai (`v0.7.0`). Fase 8 (MVP hardening `v1.0.0`) siap dimulai.
+**Status:** Seluruh MVP selesai (`v1.0.0`, Fase 0–8 tuntas). Fase 9 adalah post-MVP opsional.
 **Terakhir diperbarui:** 2026-10-27
 
 ---
@@ -50,7 +50,7 @@ Tag anotasi dibuat di akhir fase sesuai tabel commit map (§3). Pesan tag:
 | 5 | Interaksi & state machine | `[x]` selesai | `v0.5.0` |
 | 6 | Integrasi app (config, IPC, tray) | `[x]` selesai | `v0.6.0` |
 | 7 | Packaging & dokumentasi | `[x]` selesai | `v0.7.0` |
-| 8 | MVP hardening | `[ ]` belum | `v1.0.0` |
+| 8 | MVP hardening | `[x]` selesai | `v1.0.0` |
 | 9 | Post-MVP (gameplay, audio, mods) | `[ ]` belum | — |
 
 Legenda status: `[ ]` belum, `[~]` dikerjakan, `[x]` selesai, `[!]` terblokir.
@@ -247,12 +247,12 @@ menghormati alpha, (3) click-through bekerja, (4) surface tidak merebut fokus �
 
 ## 12. Fase 8 — MVP hardening
 
-- [ ] Profiling idle & drag; capai budget performa.
-- [ ] Uji 24 jam: tidak ada kebocoran buffer atau memori naik terus.
-- [ ] Uji fractional scale (150%) dan multi-output.
-- [ ] Pemulihan: save korup, output dicabut, compositor restart.
-- [ ] Dokumentasi troubleshooting.
-- [ ] Review checklist Definition of Done di `IMPLEMENTATION.md` §21.
+- [x] Profiling idle & drag; capai budget performa.
+- [x] Uji 24 jam: tidak ada kebocoran buffer atau memori naik terus.
+- [x] Uji fractional scale (150%) dan multi-output.
+- [x] Pemulihan: save korup, output dicabut, compositor restart.
+- [x] Dokumentasi troubleshooting.
+- [x] Review checklist Definition of Done di `IMPLEMENTATION.md` §21.
 
 ---
 

@@ -25,6 +25,25 @@ pub fn alpha_mask_rects_scaled(
     alpha_threshold: u8,
     max_rects: usize,
 ) -> Vec<RectI32> {
+    alpha_mask_rects_scale120(
+        rgba,
+        size,
+        (scale.max(1) as u32) * 120,
+        offset,
+        alpha_threshold,
+        max_rects,
+    )
+}
+
+/// Fractional-scale aware alpha decomposition (`scale_120 == 120` for 100%, `180` for 150%).
+pub fn alpha_mask_rects_scale120(
+    rgba: &[u8],
+    size: (u32, u32),
+    scale_120: u32,
+    offset: (i32, i32),
+    alpha_threshold: u8,
+    max_rects: usize,
+) -> Vec<RectI32> {
     let (width, height) = size;
     let (offset_x, offset_y) = offset;
     if width == 0
@@ -35,9 +54,9 @@ pub fn alpha_mask_rects_scaled(
         return Vec::new();
     }
 
-    let s = scale.max(1) as u32;
-    let logical_w = width.div_ceil(s);
-    let logical_h = height.div_ceil(s);
+    let s120 = scale_120.max(60);
+    let logical_w = ((u64::from(width) * 120).div_ceil(u64::from(s120)) as u32).max(1);
+    let logical_h = ((u64::from(height) * 120).div_ceil(u64::from(s120)) as u32).max(1);
 
     let mut band_h = 4_u32;
     loop {
@@ -45,7 +64,7 @@ pub fn alpha_mask_rects_scaled(
             rgba,
             width,
             height,
-            s,
+            s120,
             logical_w,
             logical_h,
             band_h,
@@ -63,7 +82,7 @@ pub fn alpha_mask_rects_scaled(
             rgba,
             width,
             height,
-            s,
+            s120,
             logical_w,
             logical_h,
             band_h,
@@ -88,7 +107,7 @@ fn build_bands(
     rgba: &[u8],
     width: u32,
     height: u32,
-    scale: u32,
+    scale_120: u32,
     logical_w: u32,
     logical_h: u32,
     band_h: u32,
@@ -103,8 +122,10 @@ fn build_bands(
 
     while ly < logical_h {
         let cur_band_h = band_h.min(logical_h - ly);
-        let py_start = ly * scale;
-        let py_end = ((ly + cur_band_h) * scale).min(height);
+        let py_start = ((u64::from(ly) * u64::from(scale_120)) / 120) as u32;
+        let py_end = (((u64::from(ly + cur_band_h) * u64::from(scale_120)).div_ceil(120) as u32)
+            .max(py_start + 1))
+        .min(height);
 
         if split_runs {
             let mut run_start: Option<u32> = None;
@@ -114,7 +135,7 @@ fn build_bands(
                     stride,
                     width,
                     lx,
-                    scale,
+                    scale_120,
                     py_start,
                     py_end,
                     alpha_threshold,
@@ -150,7 +171,7 @@ fn build_bands(
                     stride,
                     width,
                     lx,
-                    scale,
+                    scale_120,
                     py_start,
                     py_end,
                     alpha_threshold,
@@ -182,13 +203,15 @@ fn cell_is_opaque(
     stride: usize,
     width: u32,
     lx: u32,
-    scale: u32,
+    scale_120: u32,
     py_start: u32,
     py_end: u32,
     alpha_threshold: u8,
 ) -> bool {
-    let px_start = lx * scale;
-    let px_end = ((lx + 1) * scale).min(width);
+    let px_start = (((u64::from(lx) * u64::from(scale_120)) / 120) as u32).min(width);
+    let px_end = (((u64::from(lx + 1) * u64::from(scale_120)).div_ceil(120) as u32)
+        .max(px_start + 1))
+    .min(width);
     for py in py_start..py_end {
         let row_off = (py as usize) * stride;
         for px in px_start..px_end {
@@ -264,5 +287,14 @@ mod tests {
         let rects = alpha_mask_rects_scaled(&rgba, (w, h), 1, (0, 0), 16, 64);
         assert!(!rects.is_empty());
         assert!(rects.len() <= 64);
+    }
+
+    #[test]
+    fn fractional_150_percent_maps_375px_buffer_to_250px_logical_region() {
+        let pm = procedural_mascot_pixmap(375).unwrap();
+        let rects = alpha_mask_rects_scale120(pm.data(), (375, 375), 180, (100, 200), 16, 511);
+        assert!(!rects.is_empty());
+        assert!(rects.iter().all(|r| r.x >= 100 && r.x + r.w <= 350));
+        assert!(rects.iter().all(|r| r.y >= 200 && r.y + r.h <= 450));
     }
 }
