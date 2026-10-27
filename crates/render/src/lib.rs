@@ -6,6 +6,7 @@ pub mod damage;
 pub mod decode;
 pub mod food;
 pub mod loader;
+pub mod menu;
 pub mod text;
 
 pub use cache::{DEFAULT_CACHE_MAX_BYTES, FrameCache};
@@ -19,5 +20,6 @@ pub use decode::{
 };
 pub use food::compose_food_animation;
 pub use loader::AsyncClipLoader;
-pub use text::{BubbleRenderer, BubbleStyle, compose_pet_and_bubble};
+pub use menu::{ContextMenuRenderer, MenuEntry, MenuHit, MenuStyle, RenderedMenu};
+pub use text::{BubbleRenderer, BubbleStyle, compose_pet_and_bubble, compose_scene};
 pub use tiny_skia::Pixmap;

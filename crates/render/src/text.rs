@@ -223,6 +223,71 @@ pub fn compose_pet_and_bubble(pet: &Pixmap, bubble: Option<&Pixmap>) -> (Pixmap,
     (out, (min_x, min_y))
 }
 
+/// Composite `pet` with optional `bubble` and optional overlay `popup` menu.
+/// `popup` offset `(rel_x, rel_y)` is relative to the pet top-left coordinate.
+#[must_use]
+pub fn compose_scene(
+    pet: &Pixmap,
+    bubble: Option<&Pixmap>,
+    popup: Option<(&Pixmap, (i32, i32))>,
+) -> (Pixmap, (i32, i32)) {
+    if bubble.is_none() && popup.is_none() {
+        return (pet.clone(), (0, 0));
+    }
+
+    let mut layers: Vec<(&Pixmap, i32, i32)> = Vec::with_capacity(3);
+    layers.push((pet, 0, 0));
+
+    if let Some(bub) = bubble {
+        let gap = 4_i32;
+        let bub_rel_x = (pet.width() as i32 - bub.width() as i32) / 2;
+        let bub_rel_y = -(bub.height() as i32) - gap;
+        layers.push((bub, bub_rel_x, bub_rel_y));
+    }
+
+    if let Some((pm, rel_pos)) = popup {
+        layers.push((pm, rel_pos.0, rel_pos.1));
+    }
+
+    let mut min_x = 0_i32;
+    let mut min_y = 0_i32;
+    let mut max_x = pet.width() as i32;
+    let mut max_y = pet.height() as i32;
+
+    for (layer, lx, ly) in &layers {
+        min_x = min_x.min(*lx);
+        min_y = min_y.min(*ly);
+        max_x = max_x.max(*lx + layer.width() as i32);
+        max_y = max_y.max(*ly + layer.height() as i32);
+    }
+
+    let total_w = (max_x - min_x).max(1) as u32;
+    let total_h = (max_y - min_y).max(1) as u32;
+
+    let Some(mut out) = Pixmap::new(total_w, total_h) else {
+        return (pet.clone(), (0, 0));
+    };
+
+    let paint = PixmapPaint {
+        opacity: 1.0,
+        blend_mode: BlendMode::SourceOver,
+        quality: tiny_skia::FilterQuality::Nearest,
+    };
+
+    for (layer, lx, ly) in layers {
+        out.draw_pixmap(
+            lx - min_x,
+            ly - min_y,
+            layer.as_ref(),
+            &paint,
+            Transform::identity(),
+            None,
+        );
+    }
+
+    (out, (min_x, min_y))
+}
+
 #[inline]
 fn blend_premultiplied_over(dst: &mut [u8], src_straight: [u8; 4]) {
     let sa = u16::from(src_straight[3]);

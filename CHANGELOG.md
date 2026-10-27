@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- **Desktop Right-Click Context Menu (`vpet-render`, `vpet-wayland`, `vpet-app`)**:
+  - Right-clicking directly on the pet character on the desktop immediately opens a styled context menu right beside the pet.
+  - Features full navigation mirroring the Waybar tray menu: Status Header, Visibility/Click-Through/Overlay toggles, Sleeping, Self-Care, Auto-Work, Quick Snack/Water, Food Store submenu with pricing, Backpack inventory submenu with stack counts, Dance to Music, Work/Study/Play activities with level locks, Cancel Work, Chat with Pet prompt, Reload Config, and Quit.
+  - Automatically captures clicks outside to dismiss the menu and restores the transparent alpha input region instantly.
+  - Pauses pet auto-walk while the menu is open to prevent the pet from walking away from an open menu.
+  - Built with 100% pure Rust `tiny-skia` + `cosmic-text` without any GTK, Qt, or external UI toolkits.
+
 ## [v1.6.0] - 2026-10-28
 
 ### Added

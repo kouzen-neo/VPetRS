@@ -27,7 +27,7 @@ use smithay_client_toolkit::{
 };
 use thiserror::Error;
 use tracing::{debug, info, warn};
-use vpet_render::{Pixmap, compose_pet_and_bubble};
+use vpet_render::{Pixmap, compose_scene};
 use wayland_client::{
     Connection, QueueHandle,
     globals::{BindError, GlobalError, registry_queue_init},
@@ -180,6 +180,8 @@ pub struct WaylandShell {
 
     sprite: Pixmap,
     bubble: Option<Pixmap>,
+    overlay_popup: Option<(Pixmap, (i32, i32))>,
+    capture_input: bool,
     pet_pos: (i32, i32),
     needs_redraw: bool,
     needs_region_update: bool,
@@ -242,6 +244,8 @@ impl WaylandShell {
             closed: false,
             sprite: initial_sprite,
             bubble: None,
+            overlay_popup: None,
+            capture_input: false,
             pet_pos,
             needs_redraw: true,
             needs_region_update: true,
@@ -418,6 +422,22 @@ impl WaylandShell {
         }
     }
 
+    pub fn set_overlay_popup(&mut self, popup: Option<(Pixmap, (i32, i32))>) {
+        let changed = self.overlay_popup.is_some() != popup.is_some() || popup.is_some();
+        self.overlay_popup = popup;
+        if changed {
+            self.needs_redraw = true;
+            self.needs_region_update = true;
+        }
+    }
+
+    pub fn set_capture_input(&mut self, capture: bool) {
+        if self.capture_input != capture {
+            self.capture_input = capture;
+            self.needs_region_update = true;
+        }
+    }
+
     pub fn set_position(&mut self, x: i32, y: i32) {
         let (sw, sh) = self.sprite_logical_size();
         let min_x = -(sw as i32);
@@ -493,7 +513,15 @@ impl WaylandShell {
             return;
         };
 
-        if self.config.click_through || !self.config.visible {
+        let max_w = self.logical_size.0 as i32;
+        let max_h = self.logical_size.1 as i32;
+
+        if self.capture_input {
+            // Whole output input region when popup menu is open to catch clicks anywhere.
+            region.add(0, 0, max_w, max_h);
+            wl_surface.set_input_region(Some(region.wl_region()));
+            self.last_rect_count = 1;
+        } else if self.config.click_through || !self.config.visible {
             // Empty wl_region = strict click-through (NEVER None, which means infinite/whole surface).
             wl_surface.set_input_region(Some(region.wl_region()));
             self.last_rect_count = 0;
@@ -506,8 +534,6 @@ impl WaylandShell {
                 16,
                 MAX_INPUT_REGION_RECTS,
             );
-            let max_w = self.logical_size.0 as i32;
-            let max_h = self.logical_size.1 as i32;
             for r in &rects {
                 let x0 = r.x.clamp(0, max_w);
                 let y0 = r.y.clamp(0, max_h);
@@ -518,6 +544,13 @@ impl WaylandShell {
                 if w > 0 && h > 0 {
                     region.add(x0, y0, w, h);
                 }
+            }
+            if let Some((popup, pos)) = &self.overlay_popup {
+                let s120 = self.scale_120;
+                let pw = ((u64::from(popup.width()) * 120).div_ceil(u64::from(s120)) as i32).max(1);
+                let ph =
+                    ((u64::from(popup.height()) * 120).div_ceil(u64::from(s120)) as i32).max(1);
+                region.add(pos.0.clamp(0, max_w), pos.1.clamp(0, max_h), pw, ph);
             }
             wl_surface.set_input_region(Some(region.wl_region()));
             self.last_rect_count = rects.len();
@@ -598,8 +631,15 @@ impl WaylandShell {
         let sprite_arg = if self.config.visible {
             let px_x = logical_to_buffer_coord(self.pet_pos.0, s120);
             let px_y = logical_to_buffer_coord(self.pet_pos.1, s120);
-            if self.bubble.is_some() {
-                let (scene, delta) = compose_pet_and_bubble(&self.sprite, self.bubble.as_ref());
+
+            let popup_arg = self.overlay_popup.as_ref().map(|(pm, pos)| {
+                let popup_buf_x = logical_to_buffer_coord(pos.0, s120);
+                let popup_buf_y = logical_to_buffer_coord(pos.1, s120);
+                (pm, (popup_buf_x - px_x, popup_buf_y - px_y))
+            });
+
+            if self.bubble.is_some() || popup_arg.is_some() {
+                let (scene, delta) = compose_scene(&self.sprite, self.bubble.as_ref(), popup_arg);
                 composed_scene = scene;
                 let dst_x = px_x + delta.0;
                 let dst_y = px_y + delta.1;

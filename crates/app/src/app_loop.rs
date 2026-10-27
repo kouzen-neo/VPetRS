@@ -16,10 +16,10 @@ use vpet_content::{AnimatType, AnimationIndex, ContentDatabase, FoodItem, GraphT
 use vpet_core::{FoodEffect, World};
 use vpet_mods::ModLoader;
 use vpet_render::{
-    AsyncClipLoader, BubbleRenderer, BubbleStyle, FrameCache, Pixmap, decode_animation_source,
-    procedural_mascot_pixmap,
+    AsyncClipLoader, BubbleRenderer, BubbleStyle, ContextMenuRenderer, FrameCache, MenuEntry,
+    MenuHit, MenuStyle, Pixmap, RenderedMenu, decode_animation_source, procedural_mascot_pixmap,
 };
-use vpet_wayland::{LayerMode, SurfaceConfig, SurfaceEvent, WaylandShell};
+use vpet_wayland::{BTN_LEFT, BTN_RIGHT, LayerMode, SurfaceConfig, SurfaceEvent, WaylandShell};
 
 use std::sync::Arc;
 
@@ -31,6 +31,20 @@ use crate::{
     persistence::SaveStore,
     tray::{TrayCommand, TrayController, TrayFoodItem, TrayInventoryItem, TraySnapshot},
 };
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DesktopMenuPage {
+    Main,
+    FoodStore,
+    Works,
+    Backpack,
+}
+
+struct DesktopMenuState {
+    _page: DesktopMenuPage,
+    anchor: (i32, i32),
+    rendered: RenderedMenu,
+}
 
 #[derive(Debug, Default)]
 pub struct RunOverrides {
@@ -59,6 +73,10 @@ struct RuntimeState {
     theme_fonts: Vec<std::path::PathBuf>,
     bubble_style: BubbleStyle,
     fallback_sprite: Pixmap,
+
+    menu_renderer: Option<ContextMenuRenderer>,
+    menu_style: MenuStyle,
+    desktop_menu: Option<DesktopMenuState>,
 
     anim: InteractionController,
     shell: WaylandShell,
@@ -801,6 +819,525 @@ impl RuntimeState {
         }
     }
 
+    fn open_context_menu(&mut self, anchor: (i32, i32), page: DesktopMenuPage) {
+        let (screen_w, screen_h) = self.shell.output_logical_size();
+        let (pet_x, _pet_y) = self.shell.position();
+        let (sw, _sh) = self.shell.sprite_logical_size();
+
+        let menu_w = self.menu_style.width as i32;
+
+        let menu_x = if pet_x + sw as i32 + menu_w + 12 <= screen_w as i32 {
+            pet_x + sw as i32 + 12
+        } else if pet_x - menu_w - 12 >= 0 {
+            pet_x - menu_w - 12
+        } else {
+            (anchor.0 - menu_w / 2).clamp(10, (screen_w as i32 - menu_w - 10).max(10))
+        };
+
+        let entries = self.build_menu_entries(page);
+
+        let menu_renderer = self.menu_renderer.get_or_insert_with(|| {
+            let mut mr = ContextMenuRenderer::new();
+            for font_path in self.theme_fonts.iter().take(2) {
+                mr.load_font_file(font_path);
+            }
+            mr
+        });
+
+        let est_h = (entries.len() * 26 + 30) as i32;
+        let menu_y = (anchor.1 - 20).clamp(10, (screen_h as i32 - est_h - 10).max(10));
+
+        if let Some(rendered) =
+            menu_renderer.render_menu(&entries, &self.menu_style, (menu_x, menu_y))
+        {
+            self.shell
+                .set_overlay_popup(Some((rendered.pixmap.clone(), (menu_x, menu_y))));
+            self.shell.set_capture_input(true);
+            self.shell.present();
+            self.desktop_menu = Some(DesktopMenuState {
+                _page: page,
+                anchor,
+                rendered,
+            });
+        }
+    }
+
+    fn close_context_menu(&mut self) {
+        if self.desktop_menu.is_some() {
+            self.desktop_menu = None;
+            self.shell.set_overlay_popup(None);
+            self.shell.set_capture_input(false);
+            self.shell.present();
+        }
+    }
+
+    fn toggle_context_menu(&mut self, anchor: (i32, i32)) {
+        if self.desktop_menu.is_some() {
+            self.close_context_menu();
+        } else {
+            self.open_context_menu(anchor, DesktopMenuPage::Main);
+        }
+    }
+
+    fn build_menu_entries(&self, page: DesktopMenuPage) -> Vec<MenuEntry> {
+        let mut entries = Vec::new();
+        match page {
+            DesktopMenuPage::Main => {
+                entries.push(MenuEntry {
+                    id: 0,
+                    label: format!(
+                        "{} – Lv.{} ({})",
+                        self.world.pet.name,
+                        self.world.pet.level,
+                        self.world.pet.mode.as_str()
+                    ),
+                    subtext: None,
+                    checked: None,
+                    disabled: false,
+                    is_separator: false,
+                    is_header: true,
+                });
+
+                entries.push(MenuEntry {
+                    id: 2,
+                    label: "Show Pet".to_owned(),
+                    subtext: None,
+                    checked: Some(self.shell.visible()),
+                    disabled: false,
+                    is_separator: false,
+                    is_header: false,
+                });
+                entries.push(MenuEntry {
+                    id: 3,
+                    label: "Click-Through".to_owned(),
+                    subtext: None,
+                    checked: Some(self.shell.click_through()),
+                    disabled: false,
+                    is_separator: false,
+                    is_header: false,
+                });
+                entries.push(MenuEntry {
+                    id: 4,
+                    label: "Overlay Above Fullscreen".to_owned(),
+                    subtext: None,
+                    checked: Some(self.shell.layer_mode() == LayerMode::Overlay),
+                    disabled: false,
+                    is_separator: false,
+                    is_header: false,
+                });
+                entries.push(MenuEntry {
+                    id: 5,
+                    label: "Sleeping".to_owned(),
+                    subtext: None,
+                    checked: Some(self.world.pet.sleeping),
+                    disabled: false,
+                    is_separator: false,
+                    is_header: false,
+                });
+                entries.push(MenuEntry {
+                    id: 6,
+                    label: "Self-Care (Auto-Feed)".to_owned(),
+                    subtext: None,
+                    checked: Some(self.config.simulation.self_care),
+                    disabled: false,
+                    is_separator: false,
+                    is_header: false,
+                });
+                entries.push(MenuEntry {
+                    id: 7,
+                    label: "Auto-Work".to_owned(),
+                    subtext: None,
+                    checked: Some(self.config.simulation.auto_work),
+                    disabled: false,
+                    is_separator: false,
+                    is_header: false,
+                });
+
+                entries.push(MenuEntry {
+                    id: 0,
+                    label: String::new(),
+                    subtext: None,
+                    checked: None,
+                    disabled: false,
+                    is_separator: true,
+                    is_header: false,
+                });
+
+                entries.push(MenuEntry {
+                    id: 8,
+                    label: "Quick Snack".to_owned(),
+                    subtext: None,
+                    checked: None,
+                    disabled: false,
+                    is_separator: false,
+                    is_header: false,
+                });
+                entries.push(MenuEntry {
+                    id: 9,
+                    label: "Quick Water".to_owned(),
+                    subtext: None,
+                    checked: None,
+                    disabled: false,
+                    is_separator: false,
+                    is_header: false,
+                });
+                entries.push(MenuEntry {
+                    id: 10,
+                    label: "Food Store".to_owned(),
+                    subtext: Some(format!("${:.2} >", self.world.pet.money)),
+                    checked: None,
+                    disabled: false,
+                    is_separator: false,
+                    is_header: false,
+                });
+
+                let bp_count = self
+                    .world
+                    .inventory
+                    .to_items()
+                    .iter()
+                    .map(|it| it.count)
+                    .sum::<u32>();
+                entries.push(MenuEntry {
+                    id: 11,
+                    label: "Backpack".to_owned(),
+                    subtext: Some(format!("({bp_count}) >")),
+                    checked: None,
+                    disabled: false,
+                    is_separator: false,
+                    is_header: false,
+                });
+
+                entries.push(MenuEntry {
+                    id: 12,
+                    label: "Dance to Music".to_owned(),
+                    subtext: None,
+                    checked: None,
+                    disabled: false,
+                    is_separator: false,
+                    is_header: false,
+                });
+
+                entries.push(MenuEntry {
+                    id: 0,
+                    label: String::new(),
+                    subtext: None,
+                    checked: None,
+                    disabled: false,
+                    is_separator: true,
+                    is_header: false,
+                });
+
+                if let Some(w) = &self.world.active_work {
+                    let mins = (w.remaining_secs / 60.0).ceil() as u32;
+                    entries.push(MenuEntry {
+                        id: 0,
+                        label: format!("Working: {} ({}m left)", w.name, mins),
+                        subtext: None,
+                        checked: None,
+                        disabled: true,
+                        is_separator: false,
+                        is_header: false,
+                    });
+                    entries.push(MenuEntry {
+                        id: 14,
+                        label: "Cancel Work".to_owned(),
+                        subtext: None,
+                        checked: None,
+                        disabled: false,
+                        is_separator: false,
+                        is_header: false,
+                    });
+                } else {
+                    entries.push(MenuEntry {
+                        id: 13,
+                        label: "Work / Study / Play".to_owned(),
+                        subtext: Some(">".to_owned()),
+                        checked: None,
+                        disabled: false,
+                        is_separator: false,
+                        is_header: false,
+                    });
+                }
+
+                entries.push(MenuEntry {
+                    id: 0,
+                    label: String::new(),
+                    subtext: None,
+                    checked: None,
+                    disabled: false,
+                    is_separator: true,
+                    is_header: false,
+                });
+
+                entries.push(MenuEntry {
+                    id: 15,
+                    label: "Chat with Pet...".to_owned(),
+                    subtext: None,
+                    checked: None,
+                    disabled: !self.config.ai.enabled,
+                    is_separator: false,
+                    is_header: false,
+                });
+                entries.push(MenuEntry {
+                    id: 16,
+                    label: "Reload Config".to_owned(),
+                    subtext: None,
+                    checked: None,
+                    disabled: false,
+                    is_separator: false,
+                    is_header: false,
+                });
+                entries.push(MenuEntry {
+                    id: 17,
+                    label: "Quit".to_owned(),
+                    subtext: None,
+                    checked: None,
+                    disabled: false,
+                    is_separator: false,
+                    is_header: false,
+                });
+            }
+            DesktopMenuPage::FoodStore => {
+                entries.push(MenuEntry {
+                    id: 1,
+                    label: format!("< Back | Food Store (${:.2})", self.world.pet.money),
+                    subtext: None,
+                    checked: None,
+                    disabled: false,
+                    is_separator: false,
+                    is_header: true,
+                });
+
+                let popular = [
+                    "Fruit Juice",
+                    "1L Pure Water",
+                    "Mineral Water",
+                    "Sandwich",
+                    "Bread",
+                    "Steak",
+                    "Cookie",
+                    "Cola",
+                    "Coffee",
+                    "Medicine",
+                ];
+                for (idx, name) in popular.iter().enumerate() {
+                    let price = self.content.foods.get(name).map_or(10.0, |f| f.price);
+                    let can_afford = self.world.pet.money >= price;
+                    entries.push(MenuEntry {
+                        id: 1000 + idx as u32,
+                        label: (*name).to_owned(),
+                        subtext: Some(format!("${price:.1}")),
+                        checked: None,
+                        disabled: !can_afford,
+                        is_separator: false,
+                        is_header: false,
+                    });
+                }
+            }
+            DesktopMenuPage::Works => {
+                entries.push(MenuEntry {
+                    id: 1,
+                    label: "< Back | Work & Study".to_owned(),
+                    subtext: None,
+                    checked: None,
+                    disabled: false,
+                    is_separator: false,
+                    is_header: true,
+                });
+
+                for (idx, w) in self.pet_cfg.works.iter().enumerate() {
+                    let unlocked = self.world.pet.level >= w.level_limit;
+                    let kind_str = match w.kind {
+                        vpet_content::WorkKind::Work => "Work",
+                        vpet_content::WorkKind::Study => "Study",
+                        vpet_content::WorkKind::Play => "Play",
+                    };
+                    let sub = if unlocked {
+                        format!("{}, {}m", kind_str, w.time_mins)
+                    } else {
+                        format!("Req Lv.{}", w.level_limit)
+                    };
+                    entries.push(MenuEntry {
+                        id: 2000 + idx as u32,
+                        label: w.name.clone(),
+                        subtext: Some(sub),
+                        checked: None,
+                        disabled: !unlocked,
+                        is_separator: false,
+                        is_header: false,
+                    });
+                }
+            }
+            DesktopMenuPage::Backpack => {
+                entries.push(MenuEntry {
+                    id: 1,
+                    label: "< Back | Backpack".to_owned(),
+                    subtext: None,
+                    checked: None,
+                    disabled: false,
+                    is_separator: false,
+                    is_header: true,
+                });
+
+                let items = self.world.inventory.to_items();
+                if items.is_empty() {
+                    entries.push(MenuEntry {
+                        id: 0,
+                        label: "(Backpack is empty)".to_owned(),
+                        subtext: None,
+                        checked: None,
+                        disabled: true,
+                        is_separator: false,
+                        is_header: false,
+                    });
+                } else {
+                    for (idx, it) in items.iter().enumerate() {
+                        entries.push(MenuEntry {
+                            id: 3000 + idx as u32,
+                            label: it.id.clone(),
+                            subtext: Some(format!("x{}", it.count)),
+                            checked: None,
+                            disabled: false,
+                            is_separator: false,
+                            is_header: false,
+                        });
+                    }
+                }
+            }
+        }
+        entries
+    }
+
+    fn handle_menu_action(&mut self, action_id: u32) {
+        match action_id {
+            1 => {
+                if let Some(menu) = &self.desktop_menu {
+                    let anchor = menu.anchor;
+                    self.open_context_menu(anchor, DesktopMenuPage::Main);
+                }
+            }
+            2 => {
+                let vis = !self.shell.visible();
+                self.handle_tray_cmd(TrayCommand::SetVisible(vis));
+                self.close_context_menu();
+            }
+            3 => {
+                let ct = !self.shell.click_through();
+                self.handle_tray_cmd(TrayCommand::SetClickThrough(ct));
+                self.close_context_menu();
+            }
+            4 => {
+                let ov = self.shell.layer_mode() != LayerMode::Overlay;
+                self.handle_tray_cmd(TrayCommand::SetOverlay(ov));
+                self.close_context_menu();
+            }
+            5 => {
+                self.handle_tray_cmd(TrayCommand::ToggleSleep);
+                self.close_context_menu();
+            }
+            6 => {
+                self.handle_tray_cmd(TrayCommand::ToggleSelfCare);
+                self.close_context_menu();
+            }
+            7 => {
+                self.handle_tray_cmd(TrayCommand::ToggleAutoWork);
+                self.close_context_menu();
+            }
+            8 => {
+                self.handle_tray_cmd(TrayCommand::FeedSnack);
+                self.close_context_menu();
+            }
+            9 => {
+                self.handle_tray_cmd(TrayCommand::GiveWater);
+                self.close_context_menu();
+            }
+            10 => {
+                if let Some(menu) = &self.desktop_menu {
+                    let anchor = menu.anchor;
+                    self.open_context_menu(anchor, DesktopMenuPage::FoodStore);
+                }
+            }
+            11 => {
+                if let Some(menu) = &self.desktop_menu {
+                    let anchor = menu.anchor;
+                    self.open_context_menu(anchor, DesktopMenuPage::Backpack);
+                }
+            }
+            12 => {
+                self.handle_tray_cmd(TrayCommand::Dance);
+                self.close_context_menu();
+            }
+            13 => {
+                if let Some(menu) = &self.desktop_menu {
+                    let anchor = menu.anchor;
+                    self.open_context_menu(anchor, DesktopMenuPage::Works);
+                }
+            }
+            14 => {
+                self.handle_tray_cmd(TrayCommand::CancelWork);
+                self.close_context_menu();
+            }
+            15 => {
+                self.handle_tray_cmd(TrayCommand::PromptAiChat);
+                self.close_context_menu();
+            }
+            16 => {
+                self.handle_tray_cmd(TrayCommand::ReloadConfig);
+                self.close_context_menu();
+            }
+            17 => {
+                self.handle_tray_cmd(TrayCommand::Quit);
+                self.close_context_menu();
+            }
+            1000..=1999 => {
+                let popular = [
+                    "Fruit Juice",
+                    "1L Pure Water",
+                    "Mineral Water",
+                    "Sandwich",
+                    "Bread",
+                    "Steak",
+                    "Cookie",
+                    "Cola",
+                    "Coffee",
+                    "Medicine",
+                ];
+                let idx = (action_id - 1000) as usize;
+                if let Some(&name) = popular.get(idx) {
+                    let _ = self.feed_by_name(name);
+                    self.refresh_visuals();
+                    self.shell.present();
+                }
+                self.close_context_menu();
+            }
+            2000..=2999 => {
+                let idx = (action_id - 2000) as usize;
+                if let Some(w) = self.pet_cfg.works.get(idx) {
+                    let name = w.name.clone();
+                    let _ = self.start_work_by_name(Some(&name));
+                    self.refresh_visuals();
+                    self.shell.present();
+                }
+                self.close_context_menu();
+            }
+            3000..=3999 => {
+                let idx = (action_id - 3000) as usize;
+                let items = self.world.inventory.to_items();
+                if let Some(it) = items.get(idx) {
+                    let name = it.id.clone();
+                    let _ = self.feed_by_name(&name);
+                    self.refresh_visuals();
+                    self.shell.present();
+                }
+                self.close_context_menu();
+            }
+            _ => {
+                self.close_context_menu();
+            }
+        }
+    }
+
     fn refresh_visuals(&mut self) {
         self.loader.poll_into(&mut self.cache);
         let sprite_px = self.config.display.sprite_px();
@@ -1176,22 +1713,42 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
 
             for ev in state.shell.drain_events() {
                 match ev {
-                    SurfaceEvent::Clicked { x, y, .. } => {
-                        let (px, py) = state.shell.position();
-                        let zone = classify_hit_zone(
-                            &state.pet_cfg,
-                            state.shell.sprite_logical_size(),
-                            x - f64::from(px),
-                            y - f64::from(py),
-                        );
-                        state.anim.on_click_zone(
-                            zone,
-                            &state.content.texts,
-                            &state.anim_index,
-                            &mut state.world,
-                        );
+                    SurfaceEvent::Clicked { x, y, button } => {
+                        let click_pos = (x.round() as i32, y.round() as i32);
+                        if button == BTN_RIGHT {
+                            state.toggle_context_menu(click_pos);
+                        } else if button == BTN_LEFT {
+                            if let Some(menu) = &state.desktop_menu {
+                                match menu.rendered.hit_test(click_pos.0, click_pos.1) {
+                                    MenuHit::Item(action_id) => {
+                                        state.handle_menu_action(action_id);
+                                    }
+                                    MenuHit::InsideNoAction => {}
+                                    MenuHit::Outside => {
+                                        state.close_context_menu();
+                                    }
+                                }
+                            } else {
+                                let (px, py) = state.shell.position();
+                                let zone = classify_hit_zone(
+                                    &state.pet_cfg,
+                                    state.shell.sprite_logical_size(),
+                                    x - f64::from(px),
+                                    y - f64::from(py),
+                                );
+                                state.anim.on_click_zone(
+                                    zone,
+                                    &state.content.texts,
+                                    &state.anim_index,
+                                    &mut state.world,
+                                );
+                            }
+                        } else if state.desktop_menu.is_some() {
+                            state.close_context_menu();
+                        }
                     }
                     SurfaceEvent::DragStarted { .. } => {
+                        state.close_context_menu();
                         state
                             .anim
                             .on_drag_start(&state.anim_index, &mut state.world);
@@ -1265,7 +1822,7 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
                 .and_then(|k| state.cache.get(&k))
                 .map(|clip| clip.frames.iter().map(|f| f.duration_ms).collect());
 
-            if !state.shell.is_dragging() {
+            if !state.shell.is_dragging() && state.desktop_menu.is_none() {
                 state.anim.advance(
                     33,
                     durs.as_deref(),
@@ -1326,6 +1883,9 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
         theme_fonts,
         bubble_style,
         fallback_sprite,
+        menu_renderer: None,
+        menu_style: MenuStyle::default(),
+        desktop_menu: None,
         anim,
         shell,
         tray,
