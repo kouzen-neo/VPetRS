@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [v1.3.0] - 2026-10-27
+
+### Added
+
+- **100% Complete VPet Animation Parity Across All 23 Categories**:
+  - Connected `StartUp` (played on daemon boot) and `Shutdown` (played before exit).
+  - Connected `Pinch` (cheeks pinch animation chaining `A_Start -> B_Loop -> C_End` when clicking pinch hit box).
+  - Connected `Eating` & `Drink` 3-layer `FoodAnimation` compositing `back_lay` + `front_lay` PNG sequences and item positions.
+  - Connected `LevelUp` celebratory animation when pet gains enough experience.
+  - Connected `SideHide` border interactions (`SideHide_Left_Main` / `SideHide_Left_Rise` and `SideHide_Right_Main` / `SideHide_Right_Rise`) climbing and hiding at screen edges during auto-walk.
+  - Connected `Idel` fidget animations (Squat, Yawning, Meow, Bubbles, Boring, Tennis, amusement, etc.) randomly during idle periods.
+  - Connected `StateOne` alternative idle state.
+  - Connected `Switch` state transition animations (`Switch_Up`, `Switch_Down`, `Switch_Hunger`, `Switch_Thirsty`).
+  - Connected `Think` animation while AI LLM queries are being processed.
+
 ## [v1.2.0] - 2026-10-27
 
 ### Added

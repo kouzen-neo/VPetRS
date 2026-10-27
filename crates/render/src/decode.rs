@@ -1,6 +1,11 @@
 //! Decoders for VPet PNG frame sequences, single PNGs, APNG, and GIF animations.
 
-use std::{fs::File, io::BufReader, path::Path, sync::Arc};
+use std::{
+    fs::{self, File},
+    io::BufReader,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use image::{
     AnimationDecoder, ImageDecoder,
@@ -170,8 +175,85 @@ pub fn decode_animation_source(
             ))
         }
         AnimationSource::AnimatedImage { file, .. } => decode_animated_file(key, file, target_size),
-        AnimationSource::Food { .. } => Ok(DecodedClip::from_frames(key, Vec::new())),
+        AnimationSource::Food { dir, keyframes, .. } => {
+            let back = find_layer_dir(dir, "back").and_then(|d| decode_png_dir(&d, target_size));
+            let front = find_layer_dir(dir, "front").and_then(|d| decode_png_dir(&d, target_size));
+            if keyframes.is_empty() {
+                if let Some(b) = back {
+                    return Ok(b);
+                }
+                if let Some(f) = front {
+                    return Ok(f);
+                }
+            }
+            Ok(crate::food::compose_food_animation(
+                key,
+                keyframes,
+                back.as_ref(),
+                front.as_ref(),
+                None,
+                target_size,
+            ))
+        }
     }
+}
+
+fn decode_png_dir(dir: &Path, target_size: u32) -> Option<DecodedClip> {
+    if !dir.is_dir() {
+        return None;
+    }
+    let mut files: Vec<PathBuf> = fs::read_dir(dir)
+        .ok()?
+        .filter_map(Result::ok)
+        .map(|e| e.path())
+        .filter(|p| {
+            p.is_file()
+                && p.extension()
+                    .and_then(|e| e.to_str())
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("png"))
+        })
+        .collect();
+    if files.is_empty() {
+        return None;
+    }
+    files.sort_by(|a, b| vpet_content::natural_path_cmp(a, b));
+    let frame_files: Vec<FrameFile> = files
+        .into_iter()
+        .map(|p| FrameFile {
+            duration_ms: vpet_content::parse_frame_duration_ms(&p),
+            path: p,
+        })
+        .collect();
+    decode_png_sequence("layer", &frame_files, target_size).ok()
+}
+
+fn find_layer_dir(base: &Path, keyword: &str) -> Option<PathBuf> {
+    if !base.is_dir() {
+        return None;
+    }
+    if let Ok(entries) = fs::read_dir(base) {
+        for entry in entries.filter_map(Result::ok) {
+            let p = entry.path();
+            if p.is_dir()
+                && p.file_name()
+                    .and_then(|n| n.to_str())
+                    .is_some_and(|name| name.to_ascii_lowercase().contains(keyword))
+            {
+                return Some(p);
+            }
+        }
+    }
+    if let Ok(entries) = fs::read_dir(base) {
+        for entry in entries.filter_map(Result::ok) {
+            let p = entry.path();
+            if p.is_dir()
+                && let Some(found) = find_layer_dir(&p, keyword)
+            {
+                return Some(found);
+            }
+        }
+    }
+    None
 }
 
 #[cfg(test)]

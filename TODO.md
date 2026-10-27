@@ -51,7 +51,7 @@ Tag anotasi dibuat di akhir fase sesuai tabel commit map (§3). Pesan tag:
 | 6 | Integrasi app (config, IPC, tray) | `[x]` selesai | `v0.6.0` |
 | 7 | Packaging & dokumentasi | `[x]` selesai | `v0.7.0` |
 | 8 | MVP hardening | `[x]` selesai | `v1.0.0` |
-| 9 | Post-MVP (work, save import, theme styling, AI chat) | `[x]` selesai | `v1.2.0` |
+| 9 | Post-MVP (work, save import, theme styling, AI chat, 100% animation parity) | `[x]` selesai | `v1.3.0` |
 
 Legenda status: `[ ]` belum, `[~]` dikerjakan, `[x]` selesai, `[!]` terblokir.
 

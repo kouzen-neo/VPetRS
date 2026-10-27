@@ -69,10 +69,20 @@ struct RuntimeState {
     last_autosave: Instant,
     started_at: Instant,
     exit_after: Option<Duration>,
+    shutdown_deadline: Option<Instant>,
     running: bool,
 }
 
 impl RuntimeState {
+    fn start_shutdown(&mut self) {
+        if self.shutdown_deadline.is_none() {
+            self.anim
+                .trigger_shutdown(&self.anim_index, &mut self.world);
+            self.shutdown_deadline = Some(Instant::now() + Duration::from_millis(3000));
+            self.refresh_visuals();
+            self.shell.present();
+        }
+    }
     fn sync_tray(&self) {
         if let Some(tray) = &self.tray {
             let active_work = self
@@ -142,10 +152,17 @@ impl RuntimeState {
         };
 
         let label = effect.name.clone();
-        self.world
+        let is_drink = effect.strength_drink > effect.strength_food;
+        let gained_levels = self
+            .world
             .feed(&effect, now_unix)
             .map_err(|e| e.to_string())?;
         self.anim.show_bubble(format!("Yum! ({label})"), 3_000);
+        self.anim
+            .on_feed(is_drink, &self.anim_index, &mut self.world);
+        if gained_levels > 0 {
+            self.anim.on_level_up(&self.anim_index, &mut self.world);
+        }
         self.sync_tray();
         Ok(label)
     }
@@ -323,12 +340,7 @@ impl RuntimeState {
                     return IpcResponse::fail("AI chat is disabled in config.toml [ai]");
                 }
                 self.anim.show_bubble("...", 8_000);
-                self.anim.request_state(
-                    crate::anim::ActionState::Saying,
-                    false,
-                    &self.anim_index,
-                    &mut self.world,
-                );
+                self.anim.on_think(&self.anim_index, &mut self.world);
                 self.refresh_visuals();
                 self.shell.present();
                 if self.ai_worker.ask(&prompt) {
@@ -387,7 +399,7 @@ impl RuntimeState {
             }
             IpcRequest::Status => IpcResponse::success(self.status_snapshot()),
             IpcRequest::Quit => {
-                self.running = false;
+                self.start_shutdown();
                 IpcResponse::success(serde_json::json!({ "quitting": true }))
             }
         }
@@ -443,7 +455,7 @@ impl RuntimeState {
                 self.apply_reloaded_config(next);
             }
             TrayCommand::Quit => {
-                self.running = false;
+                self.start_shutdown();
             }
         }
     }
@@ -688,8 +700,8 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
                     });
                 }
                 Signal::SIGINT | Signal::SIGTERM => {
-                    info!("received termination signal; saving and exiting");
-                    state.running = false;
+                    info!("received termination signal; starting shutdown");
+                    state.start_shutdown();
                 }
                 _ => {}
             }
@@ -737,6 +749,14 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
         .insert_source(Timer::from_duration(anim_period), move |_, (), state| {
             if let Some(limit) = state.exit_after
                 && state.started_at.elapsed() >= limit
+            {
+                state.running = false;
+                return TimeoutAction::Drop;
+            }
+            if state.anim.is_shutdown_ready()
+                || state
+                    .shutdown_deadline
+                    .is_some_and(|dl| Instant::now() >= dl)
             {
                 state.running = false;
                 return TimeoutAction::Drop;
@@ -843,6 +863,12 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
         .map_err(|e| anyhow::anyhow!("failed to register animation timer: {e}"))?;
 
     let mut anim = InteractionController::new(sprite_px, config.display.auto_walk);
+    anim.request_state(
+        crate::anim::ActionState::StartUp,
+        true,
+        &anim_index,
+        &mut world,
+    );
     anim.ensure_clip(&anim_index, &mut world);
 
     info!(
@@ -883,6 +909,7 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
         last_autosave: Instant::now(),
         started_at: Instant::now(),
         exit_after: overrides.exit_after,
+        shutdown_deadline: None,
         running: true,
     };
 
