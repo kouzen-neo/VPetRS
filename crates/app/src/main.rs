@@ -102,6 +102,10 @@ enum CtlAction {
     Hide,
     /// Toggle mouse click-through (empty `wl_region`)
     ToggleClickthrough,
+    /// Toggle automatic feeding and hydration when low
+    ToggleSelfcare,
+    /// Toggle automatic work selection when pet is well-fed
+    ToggleAutowork,
     /// Switch Wayland layer (`top` or `overlay`)
     Layer { mode: String },
     /// Feed an item by name (or `snack` for an affordable default snack)
@@ -188,6 +192,8 @@ fn try_main() -> Result<()> {
                 CtlAction::Show => IpcRequest::Show,
                 CtlAction::Hide => IpcRequest::Hide,
                 CtlAction::ToggleClickthrough => IpcRequest::ToggleClickthrough,
+                CtlAction::ToggleSelfcare => IpcRequest::ToggleSelfCare,
+                CtlAction::ToggleAutowork => IpcRequest::ToggleAutoWork,
                 CtlAction::Layer { mode } => IpcRequest::Layer { mode },
                 CtlAction::Feed { item } => IpcRequest::Feed { item },
                 CtlAction::Sleep => IpcRequest::Sleep,

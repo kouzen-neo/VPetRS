@@ -105,6 +105,8 @@ Start the pet daemon and control it from the command line:
 vpet-rs                                 # start the layer-shell daemon
 vpet-rs ctl status                      # stats, mode, layer, output, position (JSON)
 vpet-rs ctl toggle-clickthrough         # toggle click-through
+vpet-rs ctl toggle-selfcare             # toggle auto-feeding when hungry/thirsty
+vpet-rs ctl toggle-autowork             # toggle automatic work when well-fed
 vpet-rs ctl layer overlay               # switch between `top` and `overlay`
 vpet-rs ctl feed "Fruit Juice"          # feed an item from the food database
 vpet-rs ctl chat "Hello Loris! How are you?" # chat with pet via AI LLM

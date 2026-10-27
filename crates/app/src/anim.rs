@@ -827,6 +827,10 @@ impl InteractionController {
 
         self.state = if world.pet.sleeping {
             ActionState::Sleeping { waking: false }
+        } else if let Some(work) = &world.active_work {
+            ActionState::Working {
+                graph: work.graph.clone(),
+            }
         } else {
             ActionState::Idle
         };

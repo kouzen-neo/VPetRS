@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [v1.4.0] - 2026-10-27
+
+### Added
+
+- **Self-Care (Auto-Feed) & Auto-Work System (`vpet-app`)**:
+  - Added `self_care` toggle (default: `true`) under `[simulation]` in `config.toml`: automatically feeds and hydrates the pet with snacks/water when hunger or thirst drops below 30% and stored nutrients are low.
+  - Added `auto_work` toggle (default: `false`) under `[simulation]` in `config.toml`: automatically starts the highest unlocked `Work` job when the pet is well-fed, idle, healthy, and has sufficient stamina.
+  - Added CLI commands `vpet-rs ctl toggle-selfcare` and `vpet-rs ctl toggle-autowork`.
+  - Added interactive checkmarks for `Self-Care (Auto-Feed)` and `Auto-Work` to the StatusNotifierItem waybar tray menu.
+  - Resumed previous `Working` action state seamlessly when transient actions (such as auto-feeding or being petted) complete.
+
 ## [v1.3.1] - 2026-10-27
 
 ### Fixed

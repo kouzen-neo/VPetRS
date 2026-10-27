@@ -120,6 +120,8 @@ impl PetSection {
 pub struct SimulationSection {
     pub tick_hz: u32,
     pub autosave_secs: u64,
+    pub self_care: bool,
+    pub auto_work: bool,
 }
 
 impl Default for SimulationSection {
@@ -127,6 +129,8 @@ impl Default for SimulationSection {
         Self {
             tick_hz: 10,
             autosave_secs: 300,
+            self_care: true,
+            auto_work: false,
         }
     }
 }

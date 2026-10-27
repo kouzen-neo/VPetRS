@@ -11,6 +11,8 @@ pub enum TrayCommand {
     SetClickThrough(bool),
     SetOverlay(bool),
     ToggleSleep,
+    ToggleSelfCare,
+    ToggleAutoWork,
     FeedSnack,
     GiveWater,
     StartWork(String),
@@ -28,6 +30,8 @@ pub struct TraySnapshot {
     pub click_through: bool,
     pub overlay: bool,
     pub sleeping: bool,
+    pub self_care: bool,
+    pub auto_work: bool,
     pub active_work: Option<(String, u32)>,
     pub available_works: Vec<(String, u32)>,
     pub ai_enabled: bool,
@@ -42,6 +46,8 @@ impl Default for TraySnapshot {
             click_through: false,
             overlay: false,
             sleeping: false,
+            self_care: true,
+            auto_work: false,
             active_work: None,
             available_works: Vec::new(),
             ai_enabled: true,
@@ -122,6 +128,24 @@ impl ksni::Tray for VPetTray {
                 checked: self.snap.sleeping,
                 activate: Box::new(|this: &mut Self| {
                     let _ = this.tx.send(TrayCommand::ToggleSleep);
+                }),
+                ..Default::default()
+            }
+            .into(),
+            CheckmarkItem {
+                label: "Self-Care (Auto-Feed)".to_owned(),
+                checked: self.snap.self_care,
+                activate: Box::new(|this: &mut Self| {
+                    let _ = this.tx.send(TrayCommand::ToggleSelfCare);
+                }),
+                ..Default::default()
+            }
+            .into(),
+            CheckmarkItem {
+                label: "Auto-Work".to_owned(),
+                checked: self.snap.auto_work,
+                activate: Box::new(|this: &mut Self| {
+                    let _ = this.tx.send(TrayCommand::ToggleAutoWork);
                 }),
                 ..Default::default()
             }

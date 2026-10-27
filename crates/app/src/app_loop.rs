@@ -108,6 +108,8 @@ impl RuntimeState {
                 click_through: self.shell.click_through(),
                 overlay: self.shell.layer_mode() == LayerMode::Overlay,
                 sleeping: self.world.pet.sleeping,
+                self_care: self.config.simulation.self_care,
+                auto_work: self.config.simulation.auto_work,
                 active_work,
                 available_works,
                 ai_enabled: self.config.ai.enabled,
@@ -285,6 +287,8 @@ impl RuntimeState {
             mode: self.world.pet.mode.as_str().to_owned(),
             sleeping: self.world.pet.sleeping,
             active_work: self.world.active_work.as_ref().map(|w| w.name.clone()),
+            self_care: self.config.simulation.self_care,
+            auto_work: self.config.simulation.auto_work,
             ai_enabled: self.config.ai.enabled,
             ai_model: self.config.ai.model.clone(),
             visible: self.shell.visible(),
@@ -314,6 +318,20 @@ impl RuntimeState {
                 self.shell.present();
                 self.sync_tray();
                 IpcResponse::success(serde_json::json!({ "click_through": next }))
+            }
+            IpcRequest::ToggleSelfCare => {
+                self.config.simulation.self_care = !self.config.simulation.self_care;
+                self.sync_tray();
+                IpcResponse::success(
+                    serde_json::json!({ "self_care": self.config.simulation.self_care }),
+                )
+            }
+            IpcRequest::ToggleAutoWork => {
+                self.config.simulation.auto_work = !self.config.simulation.auto_work;
+                self.sync_tray();
+                IpcResponse::success(
+                    serde_json::json!({ "auto_work": self.config.simulation.auto_work }),
+                )
             }
             IpcRequest::Layer { mode } => {
                 let Some(parsed) = LayerMode::parse(&mode) else {
@@ -454,6 +472,12 @@ impl RuntimeState {
                 self.refresh_visuals();
                 self.shell.present();
                 self.sync_tray();
+            }
+            TrayCommand::ToggleSelfCare => {
+                let _ = self.handle_ipc(IpcRequest::ToggleSelfCare);
+            }
+            TrayCommand::ToggleAutoWork => {
+                let _ = self.handle_ipc(IpcRequest::ToggleAutoWork);
             }
             TrayCommand::FeedSnack => {
                 let _ = self.feed_by_name("snack");
@@ -690,6 +714,8 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
                 click_through: shell.click_through(),
                 overlay: shell.layer_mode() == LayerMode::Overlay,
                 sleeping: world.pet.sleeping,
+                self_care: config.simulation.self_care,
+                auto_work: config.simulation.auto_work,
                 active_work: None,
                 available_works: pet_cfg
                     .works
@@ -757,6 +783,57 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
                 );
                 state.anim.show_bubble("Work completed! Great job!", 4_000);
                 state.sync_tray();
+            }
+
+            // Self-care: automatically nourish pet if hunger or thirst drops below 30%
+            if state.config.simulation.self_care
+                && !state.world.pet.sleeping
+                && !matches!(state.anim.state(), crate::anim::ActionState::Eating { .. })
+            {
+                if state.world.pet.strength_food < 30.0
+                    && state.world.pet.store_strength_food < 15.0
+                {
+                    let _ = state.feed_by_name("snack");
+                }
+                if state.world.pet.strength_drink < 30.0
+                    && state.world.pet.store_strength_drink < 15.0
+                {
+                    let _ = state.feed_by_name("water");
+                }
+            }
+
+            // Auto-work: automatically start best unlocked work when well-fed, idle, and healthy
+            if state.config.simulation.auto_work
+                && state.world.active_work.is_none()
+                && !state.world.pet.sleeping
+                && state.world.pet.strength_food >= 40.0
+                && state.world.pet.strength_drink >= 40.0
+                && state.world.pet.strength >= 30.0
+                && state.world.pet.mode != vpet_core::ModeType::Ill
+                && matches!(state.anim.state(), crate::anim::ActionState::Idle)
+            {
+                let best = state
+                    .pet_cfg
+                    .works
+                    .iter()
+                    .filter(|w| {
+                        w.kind == vpet_content::WorkKind::Work
+                            && state.world.pet.level >= w.level_limit
+                    })
+                    .max_by_key(|w| w.level_limit)
+                    .or_else(|| {
+                        state
+                            .pet_cfg
+                            .works
+                            .iter()
+                            .filter(|w| state.world.pet.level >= w.level_limit)
+                            .max_by_key(|w| w.level_limit)
+                    })
+                    .map(|w| w.name.clone());
+
+                if let Some(work_name) = best {
+                    let _ = state.start_work_by_name(Some(&work_name));
+                }
             }
 
             if let Some(reloaded) = state.watcher.check_modified() {

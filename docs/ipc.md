@@ -15,6 +15,8 @@ vpet-rs                                # Start layer-shell daemon
 vpet-rs init-config                    # Write default ~/.config/vpet-rs/config.toml
 vpet-rs ctl status                     # Print pet stats, mode, output, layer, and position
 vpet-rs ctl toggle-clickthrough        # Toggle empty wl_region click-through
+vpet-rs ctl toggle-selfcare            # Toggle self-care auto-feeding
+vpet-rs ctl toggle-autowork            # Toggle automatic work selection
 vpet-rs ctl show                       # Show pet surface
 vpet-rs ctl hide                       # Hide pet surface and clear input region
 vpet-rs ctl layer overlay              # Switch between `top` and `overlay`
@@ -35,6 +37,8 @@ Requests:
 
 ```json
 {"cmd":"toggle-clickthrough"}
+{"cmd":"toggle-self-care"}
+{"cmd":"toggle-auto-work"}
 {"cmd":"show"}
 {"cmd":"hide"}
 {"cmd":"layer","mode":"overlay"}
