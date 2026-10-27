@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [v1.5.0] - 2026-10-27
+
+### Added
+
+- **Screen Bezel Wall Alignment & Edge Drop Auto-Climbing (`SideHide`)**:
+  - Aligned `SideHide` animations with the physical screen bezel by applying VPet's canonical wall offsets (`219` left, `281` right in 500px canvas space, scaled proportionally) into negative surface X on the left and overscan X on the right.
+  - Allowed `WaylandShell` positioning to render partially off-screen while cleanly clipping `DamageRect` and clamping `wl_region` input rects within surface bounds.
+  - Automatically triggered wall climbing when releasing a dragged pet within 60 px of either screen edge.
+  - Increased border collision threshold to 25 px and added directed wall-seeking behavior during idle walks.
+  - Added CLI command `vpet-rs ctl side-hide` (alias: `sidehide`) with `--left` and `--right` flags to manually trigger wall climbing on demand.
+
 ## [v1.4.1] - 2026-10-27
 
 ### Fixed

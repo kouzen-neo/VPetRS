@@ -237,17 +237,17 @@ fn find_layer_dir(base: &Path, mode: ModeType, keyword: &str) -> Option<PathBuf>
     }
     for mode_name in [mode.as_str(), mode_name_capitalized(mode)] {
         let sub = base.join(mode_name);
-        if sub.is_dir() {
-            if let Ok(entries) = fs::read_dir(&sub) {
-                for entry in entries.filter_map(Result::ok) {
-                    let p = entry.path();
-                    if p.is_dir()
-                        && p.file_name()
-                            .and_then(|n| n.to_str())
-                            .is_some_and(|name| name.to_ascii_lowercase().contains(keyword))
-                    {
-                        return Some(p);
-                    }
+        if sub.is_dir()
+            && let Ok(entries) = fs::read_dir(&sub)
+        {
+            for entry in entries.filter_map(Result::ok) {
+                let p = entry.path();
+                if p.is_dir()
+                    && p.file_name()
+                        .and_then(|n| n.to_str())
+                        .is_some_and(|name| name.to_ascii_lowercase().contains(keyword))
+                {
+                    return Some(p);
                 }
             }
         }
@@ -341,16 +341,37 @@ mod tests {
             assert!(start.elapsed().as_millis() < 2_000);
         }
 
-        let vup_dir = Path::new("/home/kouzen/Documents/VPet/VPet-Simulator.Windows/mod/0000_core/pet/vup");
+        let vup_dir =
+            Path::new("/home/kouzen/Documents/VPet/VPet-Simulator.Windows/mod/0000_core/pet/vup");
         if vup_dir.is_dir() {
             let idx = vpet_content::AnimationIndex::scan_pet_dir("vup", vup_dir);
             for name in ["drink", "eat", "gift"] {
-                for mode in [ModeType::Nomal, ModeType::Happy, ModeType::PoorCondition, ModeType::Ill] {
-                    let entry = idx.pick(vpet_content::GraphType::Common, Some(name), vpet_content::AnimatType::Single, mode, 0)
-                        .unwrap_or_else(|| panic!("failed to find {name} animation for mode {:?}", mode));
-                    let clip = decode_animation_source(name, &entry.source, 250)
-                        .unwrap_or_else(|e| panic!("failed to decode {name} for mode {:?}: {}", mode, e));
-                    assert!(!clip.frames.is_empty(), "{name} clip for mode {:?} had 0 frames", mode);
+                for mode in [
+                    ModeType::Nomal,
+                    ModeType::Happy,
+                    ModeType::PoorCondition,
+                    ModeType::Ill,
+                ] {
+                    let entry = idx
+                        .pick(
+                            vpet_content::GraphType::Common,
+                            Some(name),
+                            vpet_content::AnimatType::Single,
+                            mode,
+                            0,
+                        )
+                        .unwrap_or_else(|| {
+                            panic!("failed to find {name} animation for mode {:?}", mode)
+                        });
+                    let clip =
+                        decode_animation_source(name, &entry.source, 250).unwrap_or_else(|e| {
+                            panic!("failed to decode {name} for mode {:?}: {}", mode, e)
+                        });
+                    assert!(
+                        !clip.frames.is_empty(),
+                        "{name} clip for mode {:?} had 0 frames",
+                        mode
+                    );
                 }
             }
         }

@@ -318,12 +318,43 @@ impl InteractionController {
     pub fn on_drag_end(
         &mut self,
         output_name: &str,
-        pos: (i32, i32),
+        mut pos: (i32, i32),
+        bounds: (u32, u32),
+        sprite_logical: (u32, u32),
         index: &AnimationIndex,
         world: &mut World,
     ) {
-        world.output_positions.insert(output_name.to_owned(), pos);
-        self.request_state(ActionState::Raised { dropping: true }, true, index, world);
+        let max_x = (bounds.0 as i32 - sprite_logical.0 as i32).max(0);
+        let offset_left = ((219_f32 * sprite_logical.0 as f32) / 500.0).round() as i32;
+        let offset_right = (((500.0 - 281_f32) * sprite_logical.0 as f32) / 500.0).round() as i32;
+        if pos.0 <= 60 {
+            pos.0 = -offset_left;
+            world.output_positions.insert(output_name.to_owned(), pos);
+            self.request_state(
+                ActionState::SideHide {
+                    left: true,
+                    emerging: false,
+                },
+                true,
+                index,
+                world,
+            );
+        } else if pos.0 >= max_x.saturating_sub(60) {
+            pos.0 = max_x + offset_right;
+            world.output_positions.insert(output_name.to_owned(), pos);
+            self.request_state(
+                ActionState::SideHide {
+                    left: false,
+                    emerging: false,
+                },
+                true,
+                index,
+                world,
+            );
+        } else {
+            world.output_positions.insert(output_name.to_owned(), pos);
+            self.request_state(ActionState::Raised { dropping: true }, true, index, world);
+        }
     }
 
     pub fn on_click_zone(
@@ -434,22 +465,35 @@ impl InteractionController {
         // Trigger occasional auto-walk, idle fidget, or alternate state from Default Idle.
         if matches!(self.state, ActionState::Idle) && !world.pet.sleeping {
             self.idle_elapsed_ms = self.idle_elapsed_ms.saturating_add(dt_ms);
-            if self.idle_elapsed_ms >= 6_000 {
+            if self.idle_elapsed_ms >= 5_000 {
                 self.idle_elapsed_ms = 0;
+                let max_x = (bounds.0 as i32 - sprite_logical.0 as i32).max(0);
                 let roll = world.rng.next_u64() % 100;
-                if roll < 40 && self.auto_walk_enabled {
-                    let dir_x = if world.rng.next_u64() & 1 == 0 { -1 } else { 1 };
+                if roll < 50 && self.auto_walk_enabled {
+                    let towards_wall = world.rng.next_u64() % 100 < 35
+                        || pos.0 < bounds.0 as i32 / 3
+                        || pos.0 > (bounds.0 as i32 * 2) / 3;
+
+                    let dir_x = if towards_wall {
+                        if pos.0 < max_x / 2 { -1 } else { 1 }
+                    } else if world.rng.next_u64() & 1 == 0 {
+                        -1
+                    } else {
+                        1
+                    };
+
+                    let loops_remaining = if towards_wall { 10 } else { 4 };
                     self.request_state(
                         ActionState::Moving {
                             dir_x,
-                            speed_px_per_sec: 48,
-                            loops_remaining: 3,
+                            speed_px_per_sec: 56,
+                            loops_remaining,
                         },
                         false,
                         index,
                         world,
                     );
-                } else if roll < 75 {
+                } else if roll < 78 {
                     self.request_state(ActionState::IdleFidget { name: None }, false, index, world);
                 } else {
                     self.request_state(ActionState::StateOne, false, index, world);
@@ -457,10 +501,17 @@ impl InteractionController {
             }
         }
 
-        // Hold edge position during SideHide
+        // Hold edge position during SideHide so character aligns exactly with screen bezel.
         if let ActionState::SideHide { left, .. } = self.state {
             let max_x = (bounds.0 as i32 - sprite_logical.0 as i32).max(0);
-            pos.0 = if left { 0 } else { max_x };
+            let offset_left = ((219_f32 * sprite_logical.0 as f32) / 500.0).round() as i32;
+            let offset_right =
+                (((500.0 - 281_f32) * sprite_logical.0 as f32) / 500.0).round() as i32;
+            pos.0 = if left {
+                -offset_left
+            } else {
+                max_x + offset_right
+            };
         }
 
         // Apply horizontal movement during `Moving` and bounce/climb cleanly at screen edges.
@@ -471,6 +522,11 @@ impl InteractionController {
         } = self.state
         {
             let max_x = (bounds.0 as i32 - sprite_logical.0 as i32).max(0);
+            if pos.0 < 0 && dir_x > 0 {
+                pos.0 = 0;
+            } else if pos.0 > max_x && dir_x < 0 {
+                pos.0 = max_x;
+            }
             self.walk_subpx += f64::from(dir_x * speed_px_per_sec) * (f64::from(dt_ms) / 1000.0);
             let step_px = self.walk_subpx.trunc() as i32;
             if step_px != 0 {
@@ -481,7 +537,9 @@ impl InteractionController {
                 pos.0 = next_x;
                 world.output_positions.insert(output_name.to_owned(), *pos);
 
-                if next_x == 0 && dir_x < 0 {
+                if next_x <= 25 && dir_x < 0 {
+                    let offset_left = ((219_f32 * sprite_logical.0 as f32) / 500.0).round() as i32;
+                    pos.0 = -offset_left;
                     self.request_state(
                         ActionState::SideHide {
                             left: true,
@@ -492,7 +550,10 @@ impl InteractionController {
                         world,
                     );
                     return;
-                } else if next_x == max_x && dir_x > 0 {
+                } else if next_x >= max_x.saturating_sub(25) && dir_x > 0 {
+                    let offset_right =
+                        (((500.0 - 281_f32) * sprite_logical.0 as f32) / 500.0).round() as i32;
+                    pos.0 = max_x + offset_right;
                     self.request_state(
                         ActionState::SideHide {
                             left: false,
@@ -599,6 +660,7 @@ impl InteractionController {
                     (false, true) => GraphType::SideHideRightRise,
                 };
                 resolve_chain_start(index, gt, None, mode, seed, Some(1), false)
+                    .or_else(|| resolve_c_end_or_single(index, gt, None, mode, seed))
             }
             ActionState::Sleeping { waking: false } => {
                 resolve_chain_start(index, GraphType::Sleep, None, mode, seed, None, true)
@@ -780,7 +842,9 @@ impl InteractionController {
         };
 
         let loop_budget = match &self.state {
-            ActionState::Touch { .. } | ActionState::Saying => Some(1),
+            ActionState::Touch { .. } | ActionState::Saying | ActionState::SideHide { .. } => {
+                Some(1)
+            }
             ActionState::Moving {
                 loops_remaining, ..
             } => Some(*loops_remaining),
@@ -1039,8 +1103,30 @@ mod tests {
         // Higher-priority Drag/Raised preempts anything and saves output position on drop.
         ctrl.on_drag_start(&idx, &mut world);
         assert_eq!(ctrl.state(), &ActionState::Raised { dropping: false });
-        ctrl.on_drag_end("eDP-1", (320, 640), &idx, &mut world);
+        ctrl.on_drag_end(
+            "eDP-1",
+            (320, 640),
+            (1920, 1080),
+            (250, 250),
+            &idx,
+            &mut world,
+        );
         assert_eq!(world.output_positions.get("eDP-1"), Some(&(320, 640)));
+
+        // Dropping within 60px of the screen edge triggers SideHide immediately.
+        ctrl.on_drag_start(&idx, &mut world);
+        ctrl.on_drag_end(
+            "eDP-1",
+            (40, 640),
+            (1920, 1080),
+            (250, 250),
+            &idx,
+            &mut world,
+        );
+        assert!(matches!(
+            ctrl.state(),
+            ActionState::SideHide { left: true, .. }
+        ));
 
         // Auto-walk hitting left screen edge (x = 0) enters SideHide at border.
         pos = (2, 760);
@@ -1066,7 +1152,7 @@ mod tests {
             &idx,
             &mut world,
         );
-        assert_eq!(pos.0, 0);
+        assert_eq!(pos.0, -110);
         assert!(matches!(
             ctrl.state(),
             ActionState::SideHide { left: true, .. }

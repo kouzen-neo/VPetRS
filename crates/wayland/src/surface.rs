@@ -420,9 +420,10 @@ impl WaylandShell {
 
     pub fn set_position(&mut self, x: i32, y: i32) {
         let (sw, sh) = self.sprite_logical_size();
-        let max_x = (self.logical_size.0 as i32 - sw as i32).max(0);
+        let min_x = -(sw as i32);
+        let max_x = self.logical_size.0 as i32;
         let max_y = (self.logical_size.1 as i32 - sh as i32).max(0);
-        let clamped = (x.clamp(0, max_x), y.clamp(0, max_y));
+        let clamped = (x.clamp(min_x, max_x), y.clamp(0, max_y));
         if self.pet_pos != clamped {
             self.pet_pos = clamped;
             self.needs_redraw = true;
@@ -505,8 +506,18 @@ impl WaylandShell {
                 16,
                 MAX_INPUT_REGION_RECTS,
             );
+            let max_w = self.logical_size.0 as i32;
+            let max_h = self.logical_size.1 as i32;
             for r in &rects {
-                region.add(r.x, r.y, r.w, r.h);
+                let x0 = r.x.clamp(0, max_w);
+                let y0 = r.y.clamp(0, max_h);
+                let x1 = (r.x + r.w).clamp(0, max_w);
+                let y1 = (r.y + r.h).clamp(0, max_h);
+                let w = x1 - x0;
+                let h = y1 - y0;
+                if w > 0 && h > 0 {
+                    region.add(x0, y0, w, h);
+                }
             }
             wl_surface.set_input_region(Some(region.wl_region()));
             self.last_rect_count = rects.len();

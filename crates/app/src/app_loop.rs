@@ -517,6 +517,41 @@ impl RuntimeState {
                 self.shell.present();
                 IpcResponse::success(serde_json::json!({ "canceled": canceled }))
             }
+            IpcRequest::SideHide { left } => {
+                let bounds = self.shell.output_logical_size();
+                let sprite_logical = self.shell.sprite_logical_size();
+                let max_x = (bounds.0 as i32 - sprite_logical.0 as i32).max(0);
+                let (px, py) = self.shell.position();
+                let is_left = left.unwrap_or(px < max_x / 2);
+                let offset_left = ((219_f32 * sprite_logical.0 as f32) / 500.0).round() as i32;
+                let offset_right =
+                    (((500.0 - 281_f32) * sprite_logical.0 as f32) / 500.0).round() as i32;
+                let target_x = if is_left {
+                    -offset_left
+                } else {
+                    max_x + offset_right
+                };
+                self.shell.set_position(target_x, py);
+                self.world
+                    .output_positions
+                    .insert(self.shell.active_output_name().to_owned(), (target_x, py));
+                self.anim.request_state(
+                    crate::anim::ActionState::SideHide {
+                        left: is_left,
+                        emerging: false,
+                    },
+                    true,
+                    &self.anim_index,
+                    &mut self.world,
+                );
+                self.refresh_visuals();
+                self.shell.present();
+                IpcResponse::success(serde_json::json!({
+                    "side_hide": true,
+                    "side": if is_left { "left" } else { "right" },
+                    "position": [target_x, py],
+                }))
+            }
             IpcRequest::Reload => {
                 let reloaded = AppConfig::load_or_default(&self.paths.config_file);
                 self.apply_reloaded_config(reloaded);
@@ -979,9 +1014,13 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
                     }
                     SurfaceEvent::DragEnded { pet_x, pet_y } => {
                         let out_name = state.shell.active_output_name().to_owned();
+                        let bounds = state.shell.output_logical_size();
+                        let sprite_logical = state.shell.sprite_logical_size();
                         state.anim.on_drag_end(
                             &out_name,
                             (pet_x, pet_y),
+                            bounds,
+                            sprite_logical,
                             &state.anim_index,
                             &mut state.world,
                         );
@@ -1148,6 +1187,18 @@ fn preload_essential_clips(
         (GraphType::Common, Some("gift"), AnimatType::Single),
         (GraphType::Common, Some("pinch"), AnimatType::Single),
         (GraphType::Common, Some("levelup"), AnimatType::Single),
+        (GraphType::SideHideLeftMain, None, AnimatType::AStart),
+        (GraphType::SideHideLeftMain, None, AnimatType::BLoop),
+        (GraphType::SideHideLeftMain, None, AnimatType::CEnd),
+        (GraphType::SideHideLeftRise, None, AnimatType::AStart),
+        (GraphType::SideHideLeftRise, None, AnimatType::BLoop),
+        (GraphType::SideHideLeftRise, None, AnimatType::CEnd),
+        (GraphType::SideHideRightMain, None, AnimatType::AStart),
+        (GraphType::SideHideRightMain, None, AnimatType::BLoop),
+        (GraphType::SideHideRightMain, None, AnimatType::CEnd),
+        (GraphType::SideHideRightRise, None, AnimatType::AStart),
+        (GraphType::SideHideRightRise, None, AnimatType::BLoop),
+        (GraphType::SideHideRightRise, None, AnimatType::CEnd),
     ];
     let items = specs.into_iter().filter_map(|(gt, name, animat)| {
         let entry = index.pick(gt, name, animat, mode, seed)?;

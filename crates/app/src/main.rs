@@ -132,6 +132,17 @@ enum CtlAction {
     },
     /// Cancel the active work session
     CancelWork,
+    /// Trigger side hide / wall climbing animation at the screen edge
+    #[command(alias = "sidehide")]
+    SideHide {
+        /// Force left side (defaults to closest screen edge)
+        #[arg(long)]
+        left: bool,
+
+        /// Force right side
+        #[arg(long)]
+        right: bool,
+    },
     /// Reload `config.toml` without restarting
     Reload,
     /// Print daemon & pet status JSON
@@ -211,6 +222,16 @@ fn try_main() -> Result<()> {
                     IpcRequest::Work { name: opt }
                 }
                 CtlAction::CancelWork => IpcRequest::CancelWork,
+                CtlAction::SideHide { left, right } => {
+                    let side = if left {
+                        Some(true)
+                    } else if right {
+                        Some(false)
+                    } else {
+                        None
+                    };
+                    IpcRequest::SideHide { left: side }
+                }
                 CtlAction::Reload => IpcRequest::Reload,
                 CtlAction::Status => IpcRequest::Status,
                 CtlAction::Quit => IpcRequest::Quit,

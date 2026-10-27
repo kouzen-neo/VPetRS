@@ -73,24 +73,23 @@ pub fn compose_food_animation(
             draw_layer(&mut frame_pm, &back.pixmap, 1.0, Transform::identity());
         }
 
-        if let Some(kf) = sample_keyframe_at(keyframes, t_curr) {
-            if kf.visible
-                && let Some(item) = item_icon
-                && item.width() > 0
-                && item.height() > 0
-            {
-                let desired_w = (kf.width * scale).max(1.0);
-                let item_scale = desired_w / (item.width() as f32);
-                let dst_x = kf.x * scale;
-                let dst_y = kf.y * scale;
-                let cx = dst_x + desired_w * 0.5;
-                let cy = dst_y + (item.height() as f32) * item_scale * 0.5;
+        if let Some(kf) = sample_keyframe_at(keyframes, t_curr)
+            && kf.visible
+            && let Some(item) = item_icon
+            && item.width() > 0
+            && item.height() > 0
+        {
+            let desired_w = (kf.width * scale).max(1.0);
+            let item_scale = desired_w / (item.width() as f32);
+            let dst_x = kf.x * scale;
+            let dst_y = kf.y * scale;
+            let cx = dst_x + desired_w * 0.5;
+            let cy = dst_y + (item.height() as f32) * item_scale * 0.5;
 
-                let transform = Transform::from_scale(item_scale, item_scale)
-                    .post_translate(dst_x, dst_y)
-                    .post_rotate_at(kf.rotate_deg, cx, cy);
-                draw_layer(&mut frame_pm, item, kf.opacity, transform);
-            }
+            let transform = Transform::from_scale(item_scale, item_scale)
+                .post_translate(dst_x, dst_y)
+                .post_rotate_at(kf.rotate_deg, cx, cy);
+            draw_layer(&mut frame_pm, item, kf.opacity, transform);
         }
 
         if let Some(front) = front_layer.and_then(|c| sample_clip_at(c, t_curr)) {

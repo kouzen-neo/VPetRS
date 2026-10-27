@@ -38,6 +38,7 @@ pub enum IpcRequest {
     ListWorks,
     Work { name: Option<String> },
     CancelWork,
+    SideHide { left: Option<bool> },
     Reload,
     Status,
     Quit,

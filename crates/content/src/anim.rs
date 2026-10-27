@@ -1164,5 +1164,25 @@ mod tests {
             .is_empty(),
             "eat animation must be queryable in Nomal mode"
         );
+        assert!(
+            !idx.query(
+                GraphType::SideHideLeftMain,
+                None,
+                AnimatType::AStart,
+                ModeType::Nomal
+            )
+            .is_empty(),
+            "sidehide_left_main AStart must be queryable in Nomal mode"
+        );
+        assert!(
+            !idx.query(
+                GraphType::SideHideRightMain,
+                None,
+                AnimatType::AStart,
+                ModeType::Nomal
+            )
+            .is_empty(),
+            "sidehide_right_main AStart must be queryable in Nomal mode"
+        );
     }
 }
