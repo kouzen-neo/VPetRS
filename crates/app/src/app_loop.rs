@@ -32,17 +32,11 @@ use crate::{
     tray::{TrayCommand, TrayController, TrayFoodItem, TrayInventoryItem, TraySnapshot},
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum DesktopMenuPage {
-    Main,
-    FoodStore,
-    Works,
-    Backpack,
-}
-
 struct DesktopMenuState {
-    _page: DesktopMenuPage,
     anchor: (i32, i32),
+    primary_pos: (i32, i32),
+    active_submenu: Option<u32>,
+    hovered_item_id: Option<u32>,
     rendered: RenderedMenu,
 }
 
@@ -819,7 +813,7 @@ impl RuntimeState {
         }
     }
 
-    fn open_context_menu(&mut self, anchor: (i32, i32), page: DesktopMenuPage) {
+    fn open_context_menu(&mut self, anchor: (i32, i32)) {
         let (screen_w, screen_h) = self.shell.output_logical_size();
         let (pet_x, _pet_y) = self.shell.position();
         let (sw, _sh) = self.shell.sprite_logical_size();
@@ -834,7 +828,54 @@ impl RuntimeState {
             (anchor.0 - menu_w / 2).clamp(10, (screen_w as i32 - menu_w - 10).max(10))
         };
 
-        let entries = self.build_menu_entries(page);
+        let est_h = 16 * 26 + 30;
+        let menu_y = (anchor.1 - 20).clamp(10, (screen_h as i32 - est_h - 10).max(10));
+
+        self.update_menu_display(anchor, (menu_x, menu_y), None, None);
+    }
+
+    fn update_menu_display(
+        &mut self,
+        anchor: (i32, i32),
+        primary_pos: (i32, i32),
+        active_submenu: Option<u32>,
+        hovered_item_id: Option<u32>,
+    ) {
+        let (screen_w, screen_h) = self.shell.output_logical_size();
+        let prim_entries = self.build_main_entries();
+        let prim_w = self.menu_style.width as i32;
+
+        let sub_data = active_submenu.and_then(|sub_id| {
+            let entries = self.build_submenu_entries(sub_id);
+            if entries.is_empty() {
+                return None;
+            }
+            let sub_w = 240_u32;
+            let sub_x = if primary_pos.0 + prim_w + sub_w as i32 + 8 <= screen_w as i32 {
+                primary_pos.0 + prim_w - 2
+            } else {
+                (primary_pos.0 - sub_w as i32 + 2).max(10)
+            };
+
+            let mut y_acc = 6_i32; // pad_y
+            for e in &prim_entries {
+                let row_h = if e.is_header {
+                    30
+                } else if e.is_separator {
+                    8
+                } else {
+                    25
+                };
+                if e.submenu_id == Some(sub_id) {
+                    break;
+                }
+                y_acc += row_h;
+            }
+            let est_sub_h = (entries.len() * 26 + 20) as i32;
+            let sub_y =
+                (primary_pos.1 + y_acc - 4).clamp(10, (screen_h as i32 - est_sub_h - 10).max(10));
+            Some((entries, (sub_x, sub_y), sub_w))
+        });
 
         let menu_renderer = self.menu_renderer.get_or_insert_with(|| {
             let mut mr = ContextMenuRenderer::new();
@@ -844,21 +885,66 @@ impl RuntimeState {
             mr
         });
 
-        let est_h = (entries.len() * 26 + 30) as i32;
-        let menu_y = (anchor.1 - 20).clamp(10, (screen_h as i32 - est_h - 10).max(10));
+        let sub_arg = sub_data
+            .as_ref()
+            .map(|(ent, pos, w)| (ent.as_slice(), *pos, *w));
 
-        if let Some(rendered) =
-            menu_renderer.render_menu(&entries, &self.menu_style, (menu_x, menu_y))
-        {
+        if let Some(rendered) = menu_renderer.render_menu(
+            &prim_entries,
+            primary_pos,
+            sub_arg,
+            hovered_item_id,
+            &self.menu_style,
+        ) {
+            let bounds = rendered.logical_bounds;
             self.shell
-                .set_overlay_popup(Some((rendered.pixmap.clone(), (menu_x, menu_y))));
+                .set_overlay_popup(Some((rendered.pixmap.clone(), (bounds.0, bounds.1))));
             self.shell.set_capture_input(true);
             self.shell.present();
             self.desktop_menu = Some(DesktopMenuState {
-                _page: page,
                 anchor,
+                primary_pos,
+                active_submenu,
+                hovered_item_id,
                 rendered,
             });
+        }
+    }
+
+    fn resolve_hover_submenu(
+        &self,
+        hovered_id: Option<u32>,
+        current_sub: Option<u32>,
+    ) -> Option<u32> {
+        let Some(id) = hovered_id else {
+            return current_sub;
+        };
+        match id {
+            10 => Some(10), // Food Store
+            11 => Some(11), // Backpack
+            13 => Some(13), // Work
+            1000..=3999 => current_sub,
+            _ => None,
+        }
+    }
+
+    fn on_menu_pointer_motion(&mut self, cursor: (i32, i32)) {
+        let Some(menu) = &self.desktop_menu else {
+            return;
+        };
+
+        let hit = menu.rendered.hit_test(cursor.0, cursor.1);
+        let hovered_id = match hit {
+            MenuHit::Item(id) => Some(id),
+            _ => None,
+        };
+
+        let target_sub = self.resolve_hover_submenu(hovered_id, menu.active_submenu);
+
+        if hovered_id != menu.hovered_item_id || target_sub != menu.active_submenu {
+            let anchor = menu.anchor;
+            let prim_pos = menu.primary_pos;
+            self.update_menu_display(anchor, prim_pos, target_sub, hovered_id);
         }
     }
 
@@ -875,238 +961,265 @@ impl RuntimeState {
         if self.desktop_menu.is_some() {
             self.close_context_menu();
         } else {
-            self.open_context_menu(anchor, DesktopMenuPage::Main);
+            self.open_context_menu(anchor);
         }
     }
 
-    fn build_menu_entries(&self, page: DesktopMenuPage) -> Vec<MenuEntry> {
+    fn build_main_entries(&self) -> Vec<MenuEntry> {
         let mut entries = Vec::new();
-        match page {
-            DesktopMenuPage::Main => {
+        entries.push(MenuEntry {
+            id: 0,
+            label: format!(
+                "{} – Lv.{} ({})",
+                self.world.pet.name,
+                self.world.pet.level,
+                self.world.pet.mode.as_str()
+            ),
+            subtext: None,
+            checked: None,
+            disabled: false,
+            is_separator: false,
+            is_header: true,
+            submenu_id: None,
+        });
+
+        entries.push(MenuEntry {
+            id: 2,
+            label: "Show Pet".to_owned(),
+            subtext: None,
+            checked: Some(self.shell.visible()),
+            disabled: false,
+            is_separator: false,
+            is_header: false,
+            submenu_id: None,
+        });
+        entries.push(MenuEntry {
+            id: 3,
+            label: "Click-Through".to_owned(),
+            subtext: None,
+            checked: Some(self.shell.click_through()),
+            disabled: false,
+            is_separator: false,
+            is_header: false,
+            submenu_id: None,
+        });
+        entries.push(MenuEntry {
+            id: 4,
+            label: "Overlay Above Fullscreen".to_owned(),
+            subtext: None,
+            checked: Some(self.shell.layer_mode() == LayerMode::Overlay),
+            disabled: false,
+            is_separator: false,
+            is_header: false,
+            submenu_id: None,
+        });
+        entries.push(MenuEntry {
+            id: 5,
+            label: "Sleeping".to_owned(),
+            subtext: None,
+            checked: Some(self.world.pet.sleeping),
+            disabled: false,
+            is_separator: false,
+            is_header: false,
+            submenu_id: None,
+        });
+        entries.push(MenuEntry {
+            id: 6,
+            label: "Self-Care (Auto-Feed)".to_owned(),
+            subtext: None,
+            checked: Some(self.config.simulation.self_care),
+            disabled: false,
+            is_separator: false,
+            is_header: false,
+            submenu_id: None,
+        });
+        entries.push(MenuEntry {
+            id: 7,
+            label: "Auto-Work".to_owned(),
+            subtext: None,
+            checked: Some(self.config.simulation.auto_work),
+            disabled: false,
+            is_separator: false,
+            is_header: false,
+            submenu_id: None,
+        });
+
+        entries.push(MenuEntry {
+            id: 0,
+            label: String::new(),
+            subtext: None,
+            checked: None,
+            disabled: false,
+            is_separator: true,
+            is_header: false,
+            submenu_id: None,
+        });
+
+        entries.push(MenuEntry {
+            id: 8,
+            label: "Quick Snack".to_owned(),
+            subtext: None,
+            checked: None,
+            disabled: false,
+            is_separator: false,
+            is_header: false,
+            submenu_id: None,
+        });
+        entries.push(MenuEntry {
+            id: 9,
+            label: "Quick Water".to_owned(),
+            subtext: None,
+            checked: None,
+            disabled: false,
+            is_separator: false,
+            is_header: false,
+            submenu_id: None,
+        });
+        entries.push(MenuEntry {
+            id: 10,
+            label: "Food Store".to_owned(),
+            subtext: Some(format!("${:.2} >", self.world.pet.money)),
+            checked: None,
+            disabled: false,
+            is_separator: false,
+            is_header: false,
+            submenu_id: Some(10),
+        });
+
+        let bp_count = self
+            .world
+            .inventory
+            .to_items()
+            .iter()
+            .map(|it| it.count)
+            .sum::<u32>();
+        entries.push(MenuEntry {
+            id: 11,
+            label: "Backpack".to_owned(),
+            subtext: Some(format!("({bp_count}) >")),
+            checked: None,
+            disabled: false,
+            is_separator: false,
+            is_header: false,
+            submenu_id: Some(11),
+        });
+
+        entries.push(MenuEntry {
+            id: 12,
+            label: "Dance to Music".to_owned(),
+            subtext: None,
+            checked: None,
+            disabled: false,
+            is_separator: false,
+            is_header: false,
+            submenu_id: None,
+        });
+
+        entries.push(MenuEntry {
+            id: 0,
+            label: String::new(),
+            subtext: None,
+            checked: None,
+            disabled: false,
+            is_separator: true,
+            is_header: false,
+            submenu_id: None,
+        });
+
+        if let Some(w) = &self.world.active_work {
+            let mins = (w.remaining_secs / 60.0).ceil() as u32;
+            entries.push(MenuEntry {
+                id: 0,
+                label: format!("Working: {} ({}m left)", w.name, mins),
+                subtext: None,
+                checked: None,
+                disabled: true,
+                is_separator: false,
+                is_header: false,
+                submenu_id: None,
+            });
+            entries.push(MenuEntry {
+                id: 14,
+                label: "Cancel Work".to_owned(),
+                subtext: None,
+                checked: None,
+                disabled: false,
+                is_separator: false,
+                is_header: false,
+                submenu_id: None,
+            });
+        } else {
+            entries.push(MenuEntry {
+                id: 13,
+                label: "Work / Study / Play".to_owned(),
+                subtext: Some(">".to_owned()),
+                checked: None,
+                disabled: false,
+                is_separator: false,
+                is_header: false,
+                submenu_id: Some(13),
+            });
+        }
+
+        entries.push(MenuEntry {
+            id: 0,
+            label: String::new(),
+            subtext: None,
+            checked: None,
+            disabled: false,
+            is_separator: true,
+            is_header: false,
+            submenu_id: None,
+        });
+
+        entries.push(MenuEntry {
+            id: 15,
+            label: "Chat with Pet...".to_owned(),
+            subtext: None,
+            checked: None,
+            disabled: !self.config.ai.enabled,
+            is_separator: false,
+            is_header: false,
+            submenu_id: None,
+        });
+        entries.push(MenuEntry {
+            id: 16,
+            label: "Reload Config".to_owned(),
+            subtext: None,
+            checked: None,
+            disabled: false,
+            is_separator: false,
+            is_header: false,
+            submenu_id: None,
+        });
+        entries.push(MenuEntry {
+            id: 17,
+            label: "Quit".to_owned(),
+            subtext: None,
+            checked: None,
+            disabled: false,
+            is_separator: false,
+            is_header: false,
+            submenu_id: None,
+        });
+
+        entries
+    }
+
+    fn build_submenu_entries(&self, sub_id: u32) -> Vec<MenuEntry> {
+        let mut entries = Vec::new();
+        match sub_id {
+            10 => {
+                // Food Store
                 entries.push(MenuEntry {
                     id: 0,
-                    label: format!(
-                        "{} – Lv.{} ({})",
-                        self.world.pet.name,
-                        self.world.pet.level,
-                        self.world.pet.mode.as_str()
-                    ),
+                    label: format!("Food Store (${:.2})", self.world.pet.money),
                     subtext: None,
                     checked: None,
                     disabled: false,
                     is_separator: false,
                     is_header: true,
-                });
-
-                entries.push(MenuEntry {
-                    id: 2,
-                    label: "Show Pet".to_owned(),
-                    subtext: None,
-                    checked: Some(self.shell.visible()),
-                    disabled: false,
-                    is_separator: false,
-                    is_header: false,
-                });
-                entries.push(MenuEntry {
-                    id: 3,
-                    label: "Click-Through".to_owned(),
-                    subtext: None,
-                    checked: Some(self.shell.click_through()),
-                    disabled: false,
-                    is_separator: false,
-                    is_header: false,
-                });
-                entries.push(MenuEntry {
-                    id: 4,
-                    label: "Overlay Above Fullscreen".to_owned(),
-                    subtext: None,
-                    checked: Some(self.shell.layer_mode() == LayerMode::Overlay),
-                    disabled: false,
-                    is_separator: false,
-                    is_header: false,
-                });
-                entries.push(MenuEntry {
-                    id: 5,
-                    label: "Sleeping".to_owned(),
-                    subtext: None,
-                    checked: Some(self.world.pet.sleeping),
-                    disabled: false,
-                    is_separator: false,
-                    is_header: false,
-                });
-                entries.push(MenuEntry {
-                    id: 6,
-                    label: "Self-Care (Auto-Feed)".to_owned(),
-                    subtext: None,
-                    checked: Some(self.config.simulation.self_care),
-                    disabled: false,
-                    is_separator: false,
-                    is_header: false,
-                });
-                entries.push(MenuEntry {
-                    id: 7,
-                    label: "Auto-Work".to_owned(),
-                    subtext: None,
-                    checked: Some(self.config.simulation.auto_work),
-                    disabled: false,
-                    is_separator: false,
-                    is_header: false,
-                });
-
-                entries.push(MenuEntry {
-                    id: 0,
-                    label: String::new(),
-                    subtext: None,
-                    checked: None,
-                    disabled: false,
-                    is_separator: true,
-                    is_header: false,
-                });
-
-                entries.push(MenuEntry {
-                    id: 8,
-                    label: "Quick Snack".to_owned(),
-                    subtext: None,
-                    checked: None,
-                    disabled: false,
-                    is_separator: false,
-                    is_header: false,
-                });
-                entries.push(MenuEntry {
-                    id: 9,
-                    label: "Quick Water".to_owned(),
-                    subtext: None,
-                    checked: None,
-                    disabled: false,
-                    is_separator: false,
-                    is_header: false,
-                });
-                entries.push(MenuEntry {
-                    id: 10,
-                    label: "Food Store".to_owned(),
-                    subtext: Some(format!("${:.2} >", self.world.pet.money)),
-                    checked: None,
-                    disabled: false,
-                    is_separator: false,
-                    is_header: false,
-                });
-
-                let bp_count = self
-                    .world
-                    .inventory
-                    .to_items()
-                    .iter()
-                    .map(|it| it.count)
-                    .sum::<u32>();
-                entries.push(MenuEntry {
-                    id: 11,
-                    label: "Backpack".to_owned(),
-                    subtext: Some(format!("({bp_count}) >")),
-                    checked: None,
-                    disabled: false,
-                    is_separator: false,
-                    is_header: false,
-                });
-
-                entries.push(MenuEntry {
-                    id: 12,
-                    label: "Dance to Music".to_owned(),
-                    subtext: None,
-                    checked: None,
-                    disabled: false,
-                    is_separator: false,
-                    is_header: false,
-                });
-
-                entries.push(MenuEntry {
-                    id: 0,
-                    label: String::new(),
-                    subtext: None,
-                    checked: None,
-                    disabled: false,
-                    is_separator: true,
-                    is_header: false,
-                });
-
-                if let Some(w) = &self.world.active_work {
-                    let mins = (w.remaining_secs / 60.0).ceil() as u32;
-                    entries.push(MenuEntry {
-                        id: 0,
-                        label: format!("Working: {} ({}m left)", w.name, mins),
-                        subtext: None,
-                        checked: None,
-                        disabled: true,
-                        is_separator: false,
-                        is_header: false,
-                    });
-                    entries.push(MenuEntry {
-                        id: 14,
-                        label: "Cancel Work".to_owned(),
-                        subtext: None,
-                        checked: None,
-                        disabled: false,
-                        is_separator: false,
-                        is_header: false,
-                    });
-                } else {
-                    entries.push(MenuEntry {
-                        id: 13,
-                        label: "Work / Study / Play".to_owned(),
-                        subtext: Some(">".to_owned()),
-                        checked: None,
-                        disabled: false,
-                        is_separator: false,
-                        is_header: false,
-                    });
-                }
-
-                entries.push(MenuEntry {
-                    id: 0,
-                    label: String::new(),
-                    subtext: None,
-                    checked: None,
-                    disabled: false,
-                    is_separator: true,
-                    is_header: false,
-                });
-
-                entries.push(MenuEntry {
-                    id: 15,
-                    label: "Chat with Pet...".to_owned(),
-                    subtext: None,
-                    checked: None,
-                    disabled: !self.config.ai.enabled,
-                    is_separator: false,
-                    is_header: false,
-                });
-                entries.push(MenuEntry {
-                    id: 16,
-                    label: "Reload Config".to_owned(),
-                    subtext: None,
-                    checked: None,
-                    disabled: false,
-                    is_separator: false,
-                    is_header: false,
-                });
-                entries.push(MenuEntry {
-                    id: 17,
-                    label: "Quit".to_owned(),
-                    subtext: None,
-                    checked: None,
-                    disabled: false,
-                    is_separator: false,
-                    is_header: false,
-                });
-            }
-            DesktopMenuPage::FoodStore => {
-                entries.push(MenuEntry {
-                    id: 1,
-                    label: format!("< Back | Food Store (${:.2})", self.world.pet.money),
-                    subtext: None,
-                    checked: None,
-                    disabled: false,
-                    is_separator: false,
-                    is_header: true,
+                    submenu_id: None,
                 });
 
                 let popular = [
@@ -1132,18 +1245,61 @@ impl RuntimeState {
                         disabled: !can_afford,
                         is_separator: false,
                         is_header: false,
+                        submenu_id: None,
                     });
                 }
             }
-            DesktopMenuPage::Works => {
+            11 => {
+                // Backpack
                 entries.push(MenuEntry {
-                    id: 1,
-                    label: "< Back | Work & Study".to_owned(),
+                    id: 0,
+                    label: "Backpack Inventory".to_owned(),
                     subtext: None,
                     checked: None,
                     disabled: false,
                     is_separator: false,
                     is_header: true,
+                    submenu_id: None,
+                });
+
+                let items = self.world.inventory.to_items();
+                if items.is_empty() {
+                    entries.push(MenuEntry {
+                        id: 0,
+                        label: "(Backpack is empty)".to_owned(),
+                        subtext: None,
+                        checked: None,
+                        disabled: true,
+                        is_separator: false,
+                        is_header: false,
+                        submenu_id: None,
+                    });
+                } else {
+                    for (idx, it) in items.iter().enumerate() {
+                        entries.push(MenuEntry {
+                            id: 3000 + idx as u32,
+                            label: it.id.clone(),
+                            subtext: Some(format!("x{}", it.count)),
+                            checked: None,
+                            disabled: false,
+                            is_separator: false,
+                            is_header: false,
+                            submenu_id: None,
+                        });
+                    }
+                }
+            }
+            13 => {
+                // Works
+                entries.push(MenuEntry {
+                    id: 0,
+                    label: "Work / Study / Play".to_owned(),
+                    subtext: None,
+                    checked: None,
+                    disabled: false,
+                    is_separator: false,
+                    is_header: true,
+                    submenu_id: None,
                 });
 
                 for (idx, w) in self.pet_cfg.works.iter().enumerate() {
@@ -1166,57 +1322,17 @@ impl RuntimeState {
                         disabled: !unlocked,
                         is_separator: false,
                         is_header: false,
+                        submenu_id: None,
                     });
                 }
             }
-            DesktopMenuPage::Backpack => {
-                entries.push(MenuEntry {
-                    id: 1,
-                    label: "< Back | Backpack".to_owned(),
-                    subtext: None,
-                    checked: None,
-                    disabled: false,
-                    is_separator: false,
-                    is_header: true,
-                });
-
-                let items = self.world.inventory.to_items();
-                if items.is_empty() {
-                    entries.push(MenuEntry {
-                        id: 0,
-                        label: "(Backpack is empty)".to_owned(),
-                        subtext: None,
-                        checked: None,
-                        disabled: true,
-                        is_separator: false,
-                        is_header: false,
-                    });
-                } else {
-                    for (idx, it) in items.iter().enumerate() {
-                        entries.push(MenuEntry {
-                            id: 3000 + idx as u32,
-                            label: it.id.clone(),
-                            subtext: Some(format!("x{}", it.count)),
-                            checked: None,
-                            disabled: false,
-                            is_separator: false,
-                            is_header: false,
-                        });
-                    }
-                }
-            }
+            _ => {}
         }
         entries
     }
 
     fn handle_menu_action(&mut self, action_id: u32) {
         match action_id {
-            1 => {
-                if let Some(menu) = &self.desktop_menu {
-                    let anchor = menu.anchor;
-                    self.open_context_menu(anchor, DesktopMenuPage::Main);
-                }
-            }
             2 => {
                 let vis = !self.shell.visible();
                 self.handle_tray_cmd(TrayCommand::SetVisible(vis));
@@ -1252,27 +1368,9 @@ impl RuntimeState {
                 self.handle_tray_cmd(TrayCommand::GiveWater);
                 self.close_context_menu();
             }
-            10 => {
-                if let Some(menu) = &self.desktop_menu {
-                    let anchor = menu.anchor;
-                    self.open_context_menu(anchor, DesktopMenuPage::FoodStore);
-                }
-            }
-            11 => {
-                if let Some(menu) = &self.desktop_menu {
-                    let anchor = menu.anchor;
-                    self.open_context_menu(anchor, DesktopMenuPage::Backpack);
-                }
-            }
             12 => {
                 self.handle_tray_cmd(TrayCommand::Dance);
                 self.close_context_menu();
-            }
-            13 => {
-                if let Some(menu) = &self.desktop_menu {
-                    let anchor = menu.anchor;
-                    self.open_context_menu(anchor, DesktopMenuPage::Works);
-                }
             }
             14 => {
                 self.handle_tray_cmd(TrayCommand::CancelWork);
@@ -1713,6 +1811,11 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
 
             for ev in state.shell.drain_events() {
                 match ev {
+                    SurfaceEvent::PointerMotion { x, y } => {
+                        if state.desktop_menu.is_some() {
+                            state.on_menu_pointer_motion((x.round() as i32, y.round() as i32));
+                        }
+                    }
                     SurfaceEvent::Clicked { x, y, button } => {
                         let click_pos = (x.round() as i32, y.round() as i32);
                         if button == BTN_RIGHT {
@@ -1822,11 +1925,16 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
                 .and_then(|k| state.cache.get(&k))
                 .map(|clip| clip.frames.iter().map(|f| f.duration_ms).collect());
 
-            if !state.shell.is_dragging() && state.desktop_menu.is_none() {
+            if !state.shell.is_dragging() {
+                let mut step_pos = if state.desktop_menu.is_some() {
+                    (pos.0, pos.1)
+                } else {
+                    pos
+                };
                 state.anim.advance(
                     33,
                     durs.as_deref(),
-                    &mut pos,
+                    &mut step_pos,
                     AdvanceViewport {
                         bounds,
                         sprite_logical,
@@ -1835,7 +1943,10 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
                     &state.anim_index,
                     &mut state.world,
                 );
-                state.shell.set_position(pos.0, pos.1);
+                if state.desktop_menu.is_none() {
+                    pos = step_pos;
+                    state.shell.set_position(pos.0, pos.1);
+                }
             }
 
             state.refresh_visuals();

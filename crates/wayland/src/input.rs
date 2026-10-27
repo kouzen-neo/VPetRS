@@ -9,6 +9,7 @@ const DRAG_THRESHOLD_PX: f64 = 4.0;
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SurfaceEvent {
     HoverChanged(bool),
+    PointerMotion { x: f64, y: f64 },
     Clicked { x: f64, y: f64, button: u32 },
     DragStarted { pet_x: i32, pet_y: i32 },
     Dragged { pet_x: i32, pet_y: i32 },
@@ -90,23 +91,26 @@ impl PointerTracker {
         sprite_logical: (u32, u32),
     ) -> Option<SurfaceEvent> {
         self.cursor_pos = pos;
-        let grab = self.grab.as_mut()?;
-        let dx = pos.0 - grab.press_pos.0;
-        let dy = pos.1 - grab.press_pos.1;
-        if !grab.dragging && dx.hypot(dy) < DRAG_THRESHOLD_PX {
-            return None;
-        }
+        if let Some(grab) = self.grab.as_mut() {
+            let dx = pos.0 - grab.press_pos.0;
+            let dy = pos.1 - grab.press_pos.1;
+            if !grab.dragging && dx.hypot(dy) < DRAG_THRESHOLD_PX {
+                return None;
+            }
 
-        let max_x = (bounds.0 as i32 - sprite_logical.0 as i32).max(0);
-        let max_y = (bounds.1 as i32 - sprite_logical.1 as i32).max(0);
-        let pet_x = ((pos.0 - grab.offset_x).round() as i32).clamp(0, max_x);
-        let pet_y = ((pos.1 - grab.offset_y).round() as i32).clamp(0, max_y);
+            let max_x = (bounds.0 as i32 - sprite_logical.0 as i32).max(0);
+            let max_y = (bounds.1 as i32 - sprite_logical.1 as i32).max(0);
+            let pet_x = ((pos.0 - grab.offset_x).round() as i32).clamp(0, max_x);
+            let pet_y = ((pos.1 - grab.offset_y).round() as i32).clamp(0, max_y);
 
-        if !grab.dragging {
-            grab.dragging = true;
-            Some(SurfaceEvent::DragStarted { pet_x, pet_y })
+            if !grab.dragging {
+                grab.dragging = true;
+                Some(SurfaceEvent::DragStarted { pet_x, pet_y })
+            } else {
+                Some(SurfaceEvent::Dragged { pet_x, pet_y })
+            }
         } else {
-            Some(SurfaceEvent::Dragged { pet_x, pet_y })
+            Some(SurfaceEvent::PointerMotion { x: pos.0, y: pos.1 })
         }
     }
 
