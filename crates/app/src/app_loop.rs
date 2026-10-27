@@ -137,16 +137,42 @@ impl RuntimeState {
 
     fn feed_by_name(&mut self, query: &str) -> std::result::Result<String, String> {
         let now_unix = unix_now();
-        let effect = if let Some(item) = self.content.foods.get(query) {
-            food_item_to_effect(item)
-        } else if query.eq_ignore_ascii_case("snack") || query.eq_ignore_ascii_case("apple") {
+        let effect = if query.eq_ignore_ascii_case("water") || query.eq_ignore_ascii_case("drink") {
             self.content
                 .foods
                 .all()
                 .into_iter()
+                .filter(|f| f.strength_drink > f.strength_food)
+                .find(|f| f.price <= self.world.pet.money)
+                .map(food_item_to_effect)
+                .unwrap_or_else(|| FoodEffect {
+                    name: "Pure Water".to_owned(),
+                    price: 0.0,
+                    exp: 2.0,
+                    strength: 5.0,
+                    strength_food: 0.0,
+                    strength_drink: 40.0,
+                    feeling: 5.0,
+                    health: 1.0,
+                    likability: 0.5,
+                    buff_id: None,
+                    buff_time_mins: 0,
+                })
+        } else if query.eq_ignore_ascii_case("snack")
+            || query.eq_ignore_ascii_case("food")
+            || query.eq_ignore_ascii_case("meal")
+            || query.eq_ignore_ascii_case("apple")
+        {
+            self.content
+                .foods
+                .all()
+                .into_iter()
+                .filter(|f| f.strength_food >= f.strength_drink)
                 .find(|f| f.price <= self.world.pet.money)
                 .map(food_item_to_effect)
                 .unwrap_or_else(default_snack_effect)
+        } else if let Some(item) = self.content.foods.get(query) {
+            food_item_to_effect(item)
         } else {
             return Err(format!("unknown food item `{query}`"));
         };
@@ -355,37 +381,34 @@ impl RuntimeState {
                 spawn_desktop_input_prompt(&self.paths.socket_path);
                 IpcResponse::success(serde_json::json!({ "prompt_spawned": true }))
             }
-            IpcRequest::Work { name } => {
-                if let Some(n) = name.filter(|s| !s.trim().is_empty()) {
-                    match self.start_work_by_name(Some(&n)) {
-                        Ok(started) => {
-                            self.refresh_visuals();
-                            self.shell.present();
-                            IpcResponse::success(serde_json::json!({ "started": started }))
-                        }
-                        Err(err) => IpcResponse::fail(err),
-                    }
-                } else {
-                    let available: Vec<_> = self
-                        .pet_cfg
-                        .works
-                        .iter()
-                        .map(|w| {
-                            serde_json::json!({
-                                "name": w.name,
-                                "kind": format!("{:?}", w.kind),
-                                "level_required": w.level_limit,
-                                "time_mins": w.time_mins,
-                                "money_base": w.money_base,
-                            })
+            IpcRequest::ListWorks => {
+                let available: Vec<_> = self
+                    .pet_cfg
+                    .works
+                    .iter()
+                    .map(|w| {
+                        serde_json::json!({
+                            "name": w.name,
+                            "kind": format!("{:?}", w.kind),
+                            "level_required": w.level_limit,
+                            "time_mins": w.time_mins,
+                            "money_base": w.money_base,
                         })
-                        .collect();
-                    IpcResponse::success(serde_json::json!({
-                        "active": self.world.active_work.as_ref().map(|w| &w.name),
-                        "works": available,
-                    }))
-                }
+                    })
+                    .collect();
+                IpcResponse::success(serde_json::json!({
+                    "active": self.world.active_work.as_ref().map(|w| &w.name),
+                    "works": available,
+                }))
             }
+            IpcRequest::Work { name } => match self.start_work_by_name(name.as_deref()) {
+                Ok(started) => {
+                    self.refresh_visuals();
+                    self.shell.present();
+                    IpcResponse::success(serde_json::json!({ "started": started }))
+                }
+                Err(err) => IpcResponse::fail(err),
+            },
             IpcRequest::CancelWork => {
                 let canceled = self.cancel_active_work();
                 self.refresh_visuals();
@@ -434,6 +457,11 @@ impl RuntimeState {
             }
             TrayCommand::FeedSnack => {
                 let _ = self.feed_by_name("snack");
+                self.refresh_visuals();
+                self.shell.present();
+            }
+            TrayCommand::GiveWater => {
+                let _ = self.feed_by_name("water");
                 self.refresh_visuals();
                 self.shell.present();
             }
@@ -556,6 +584,10 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
             w.pet.mode = config.pet.parsed_start_mode();
             w
         });
+    world.pet.money = world.pet.money.max(10.0);
+    if config.pet.locale.starts_with("en") && vpet_content::contains_cjk(&world.pet.name) {
+        world.pet.name = "Loris".to_owned();
+    }
 
     let sprite_px = config.display.sprite_px();
     let mut cache = FrameCache::new(config.app.cache_mb.max(16) * 1024 * 1024);

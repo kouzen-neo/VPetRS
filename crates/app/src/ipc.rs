@@ -33,6 +33,7 @@ pub enum IpcRequest {
     Say { text: String },
     Chat { prompt: String },
     PromptInput,
+    ListWorks,
     Work { name: Option<String> },
     CancelWork,
     Reload,

@@ -12,6 +12,7 @@ pub enum TrayCommand {
     SetOverlay(bool),
     ToggleSleep,
     FeedSnack,
+    GiveWater,
     StartWork(String),
     CancelWork,
     PromptAiChat,
@@ -129,6 +130,14 @@ impl ksni::Tray for VPetTray {
                 label: "Feed Snack".to_owned(),
                 activate: Box::new(|this: &mut Self| {
                     let _ = this.tx.send(TrayCommand::FeedSnack);
+                }),
+                ..Default::default()
+            }
+            .into(),
+            StandardItem {
+                label: "Give Water".to_owned(),
+                activate: Box::new(|this: &mut Self| {
+                    let _ = this.tx.send(TrayCommand::GiveWater);
                 }),
                 ..Default::default()
             }

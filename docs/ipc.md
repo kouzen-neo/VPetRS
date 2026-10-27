@@ -39,8 +39,10 @@ Requests:
 {"cmd":"hide"}
 {"cmd":"layer","mode":"overlay"}
 {"cmd":"feed","item":"Fruit Juice"}
+{"cmd":"list-works"}
 {"cmd":"work","name":"Copywriting"}
 {"cmd":"cancel-work"}
+{"cmd":"chat","prompt":"Hello Loris!"}
 {"cmd":"sleep"}
 {"cmd":"wake"}
 {"cmd":"say","text":"Hello!"}

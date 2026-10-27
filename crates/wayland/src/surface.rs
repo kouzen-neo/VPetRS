@@ -591,7 +591,7 @@ impl WaylandShell {
                 let (scene, delta) = compose_pet_and_bubble(&self.sprite, self.bubble.as_ref());
                 composed_scene = scene;
                 let dst_x = px_x + delta.0;
-                let dst_y = (px_y + delta.1).max(0);
+                let dst_y = px_y + delta.1;
                 Some((&composed_scene, dst_x, dst_y))
             } else {
                 Some((&self.sprite, px_x, px_y))

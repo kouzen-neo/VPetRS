@@ -195,7 +195,7 @@ fn try_main() -> Result<()> {
                 CtlAction::Say { text } => IpcRequest::Say { text },
                 CtlAction::Chat { prompt } => IpcRequest::Chat { prompt },
                 CtlAction::PromptChat => IpcRequest::PromptInput,
-                CtlAction::Works => IpcRequest::Work { name: None },
+                CtlAction::Works => IpcRequest::ListWorks,
                 CtlAction::Work { name } => {
                     let opt = if name.trim().is_empty() {
                         None
@@ -317,8 +317,8 @@ fn setup_assets_command(from: Option<&std::path::Path>, dest: &std::path::Path) 
             "--filter=blob:none",
             "--sparse",
             "https://github.com/LorisYounger/VPet.git",
-            tmp.path().to_str().unwrap(),
         ])
+        .arg(tmp.path())
         .status()
         .context("failed to execute git clone")?;
     if !status.success() {

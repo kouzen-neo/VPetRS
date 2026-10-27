@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [v1.3.1] - 2026-10-27
+
+### Fixed
+
+- **Starvation & Study/Play Balance Invariants**:
+  - Prevented continuous health drain when hunger/thirst are already at 0.0 (penalty only applies once during depletion transition; gentle starvation damage replaces runaway drain).
+  - Fixed sleep metabolism so stamina and health regenerate without draining hunger or thirst, matching VPet C# AFK design.
+  - Clamped money to non-negative values and automatically canceled study/play tasks when funds are insufficient to pay tuition.
+  - Sanitized existing negative save balance with automatic $10 recovery allowance on boot.
+- **Surface & Speech Bubble Alignment**:
+  - Removed top clamping in speech bubble composition so the pet's coordinates remain perfectly anchored when speech bubbles appear and disappear.
+- **Command & Tray Usability**:
+  - Added dedicated `Give Water` action in StatusNotifierItem tray menu.
+  - Separated `IpcRequest::ListWorks` (`vpet-rs ctl works`) from `IpcRequest::Work` (`vpet-rs ctl work [name]`).
+  - Added fallback to free food/water in `feed` command when money is completely depleted.
+
 ## [v1.3.0] - 2026-10-27
 
 ### Added
