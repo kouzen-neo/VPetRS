@@ -229,25 +229,62 @@ impl RuntimeState {
             || query.eq_ignore_ascii_case("meal")
             || query.eq_ignore_ascii_case("apple")
         {
-            let found = self
+            let default_snack_icon = self
                 .content
                 .foods
-                .all()
-                .into_iter()
-                .filter(|f| f.graph == "eat")
-                .find(|f| f.price <= self.world.pet.money);
+                .get("Sandwich")
+                .or_else(|| self.content.foods.get("Bread"))
+                .or_else(|| self.content.foods.get("Gummy"))
+                .or_else(|| self.content.foods.get("Pork Jerky"))
+                .and_then(|f| f.image_path.clone());
+
+            let found = if query.eq_ignore_ascii_case("apple") {
+                self.content.foods.get("Apple")
+            } else {
+                self.content
+                    .foods
+                    .all()
+                    .into_iter()
+                    .filter(|f| {
+                        f.graph == "eat"
+                            && f.category.eq_ignore_ascii_case("snack")
+                            && f.image_path.is_some()
+                    })
+                    .find(|f| f.price <= self.world.pet.money)
+                    .or_else(|| {
+                        self.content
+                            .foods
+                            .all()
+                            .into_iter()
+                            .filter(|f| f.graph == "eat" && f.image_path.is_some())
+                            .find(|f| f.price <= self.world.pet.money)
+                    })
+            };
+
             match found {
                 Some(f) => (
                     food_item_to_effect(f),
-                    f.image_path.clone(),
+                    f.image_path.clone().or_else(|| default_snack_icon.clone()),
                     "eat".to_owned(),
                 ),
-                None => (default_snack_effect(), None, "eat".to_owned()),
+                None => (default_snack_effect(), default_snack_icon, "eat".to_owned()),
             }
         } else if let Some(item) = self.content.foods.get(query) {
+            let fallback_icon = if item.graph == "drink" {
+                self.content
+                    .foods
+                    .get("Mineral Water")
+                    .and_then(|f| f.image_path.clone())
+            } else {
+                self.content
+                    .foods
+                    .get("Sandwich")
+                    .or_else(|| self.content.foods.get("Bread"))
+                    .and_then(|f| f.image_path.clone())
+            };
             (
                 food_item_to_effect(item),
-                item.image_path.clone(),
+                item.image_path.clone().or(fallback_icon),
                 item.graph.clone(),
             )
         } else {

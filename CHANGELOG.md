@@ -17,6 +17,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Increased border collision threshold to 25 px and added directed wall-seeking behavior during idle walks.
   - Added CLI command `vpet-rs ctl side-hide` (alias: `sidehide`) with `--left` and `--right` flags to manually trigger wall climbing on demand.
 
+### Fixed
+
+- **Food Item Icon Lookup & Keyframe Opacity (`vpet-content`, `vpet-app`)**:
+  - Parsed `image#` attribute from LPS food definitions (e.g. `黄金月饼.png` for `` `金`秋月饼 ``), resolving missing food icon paths.
+  - Fixed keyframe opacity parsing so fractional opacity values (such as `0.375`) are not erroneously divided by 100 into near-zero transparency.
+  - Prioritized items categorized under `Snack` with guaranteed icons when feeding snacks, and added fallback sandwich/bread icons.
+
 ## [v1.4.1] - 2026-10-27
 
 ### Fixed

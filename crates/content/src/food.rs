@@ -42,9 +42,16 @@ impl FoodDatabase {
             let Some(name) = line.get("name").map(str::trim).filter(|s| !s.is_empty()) else {
                 continue;
             };
-            let image_path = image_food_dir
-                .map(|dir| dir.join(format!("{name}.png")))
-                .filter(|p| p.is_file());
+            let img_target = line.get("image").unwrap_or(name);
+            let image_path = image_food_dir.and_then(|dir| {
+                let p = dir.join(format!("{img_target}.png"));
+                if p.is_file() {
+                    Some(p)
+                } else {
+                    let p2 = dir.join(format!("{name}.png"));
+                    p2.is_file().then_some(p2)
+                }
+            });
 
             let item = FoodItem {
                 name: name.to_owned(),
