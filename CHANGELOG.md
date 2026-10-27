@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [v1.4.1] - 2026-10-27
+
+### Fixed
+
+- **Feeding Frame Composition & Async Playback Timing**:
+  - Sliced 3-layer `FoodAnimation` clips at union timestamps of background, foreground, and keyframes so no animation frames freeze during long eating intervals.
+  - Prioritized mode-specific subdirectories when resolving `back_lay` and `front_lay` PNG folders (fixing `Drink` in `Nomal` and `Ill` modes).
+  - Ensured single transient animation playback pauses until asynchronous background decoding completes rather than prematurely cutting off in 125ms.
+  - Rendered food item icon in the pet's hand for `eat`, `drink`, and `gift` actions.
+  - Prioritized pure water bottles for `water` queries and tray menu actions.
+
 ## [v1.4.0] - 2026-10-27
 
 ### Added
