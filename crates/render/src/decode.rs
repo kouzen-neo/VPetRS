@@ -12,7 +12,7 @@ use image::{
     codecs::{gif::GifDecoder, png::PngDecoder},
 };
 use tiny_skia::Pixmap;
-use vpet_content::{AnimationSource, FrameFile};
+use vpet_content::{AnimationSource, FrameFile, ModeType};
 
 use crate::canvas::{RenderError, load_sprite_scaled, rgba_image_to_pixmap, scale_pixmap};
 
@@ -175,23 +175,27 @@ pub fn decode_animation_source(
             ))
         }
         AnimationSource::AnimatedImage { file, .. } => decode_animated_file(key, file, target_size),
-        AnimationSource::Food { dir, keyframes, .. } => {
-            let back = find_layer_dir(dir, "back").and_then(|d| decode_png_dir(&d, target_size));
-            let front = find_layer_dir(dir, "front").and_then(|d| decode_png_dir(&d, target_size));
-            if keyframes.is_empty() {
-                if let Some(b) = back {
-                    return Ok(b);
-                }
-                if let Some(f) = front {
-                    return Ok(f);
-                }
-            }
+        AnimationSource::Food {
+            dir,
+            keyframes,
+            mode,
+            item_icon_path,
+            ..
+        } => {
+            let back =
+                find_layer_dir(dir, *mode, "back").and_then(|d| decode_png_dir(&d, target_size));
+            let front =
+                find_layer_dir(dir, *mode, "front").and_then(|d| decode_png_dir(&d, target_size));
+            let item_icon = item_icon_path.as_deref().and_then(|p| {
+                load_sprite_scaled(p, (target_size / 2).max(32), (target_size / 2).max(32)).ok()
+            });
+
             Ok(crate::food::compose_food_animation(
                 key,
                 keyframes,
                 back.as_ref(),
                 front.as_ref(),
-                None,
+                item_icon.as_ref(),
                 target_size,
             ))
         }
@@ -227,9 +231,26 @@ fn decode_png_dir(dir: &Path, target_size: u32) -> Option<DecodedClip> {
     decode_png_sequence("layer", &frame_files, target_size).ok()
 }
 
-fn find_layer_dir(base: &Path, keyword: &str) -> Option<PathBuf> {
+fn find_layer_dir(base: &Path, mode: ModeType, keyword: &str) -> Option<PathBuf> {
     if !base.is_dir() {
         return None;
+    }
+    for mode_name in [mode.as_str(), mode_name_capitalized(mode)] {
+        let sub = base.join(mode_name);
+        if sub.is_dir() {
+            if let Ok(entries) = fs::read_dir(&sub) {
+                for entry in entries.filter_map(Result::ok) {
+                    let p = entry.path();
+                    if p.is_dir()
+                        && p.file_name()
+                            .and_then(|n| n.to_str())
+                            .is_some_and(|name| name.to_ascii_lowercase().contains(keyword))
+                    {
+                        return Some(p);
+                    }
+                }
+            }
+        }
     }
     if let Ok(entries) = fs::read_dir(base) {
         for entry in entries.filter_map(Result::ok) {
@@ -247,13 +268,22 @@ fn find_layer_dir(base: &Path, keyword: &str) -> Option<PathBuf> {
         for entry in entries.filter_map(Result::ok) {
             let p = entry.path();
             if p.is_dir()
-                && let Some(found) = find_layer_dir(&p, keyword)
+                && let Some(found) = find_layer_dir(&p, mode, keyword)
             {
                 return Some(found);
             }
         }
     }
     None
+}
+
+fn mode_name_capitalized(mode: ModeType) -> &'static str {
+    match mode {
+        ModeType::Happy => "Happy",
+        ModeType::Nomal => "Nomal",
+        ModeType::PoorCondition => "PoorCondition",
+        ModeType::Ill => "Ill",
+    }
 }
 
 #[cfg(test)]

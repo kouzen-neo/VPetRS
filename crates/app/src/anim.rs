@@ -2,6 +2,8 @@
 //! Priority animation state machine, `A_Start -> B_Loop -> C_End` segment player,
 //! `500x500` logical hit-region classifier, auto-walk, and headless interaction controller.
 
+use std::path::PathBuf;
+
 use vpet_content::{
     AnimatType, AnimationEntry, AnimationIndex, AnimationSource, GraphType, PetConfig,
 };
@@ -98,7 +100,9 @@ pub enum ActionState {
     },
     Pinch,
     Eating {
-        is_drink: bool,
+        graph: String,
+        food_name: Option<String>,
+        icon_path: Option<PathBuf>,
     },
     LevelUp,
     Switch {
@@ -214,8 +218,24 @@ impl InteractionController {
         self.request_state(ActionState::Shutdown { exiting: true }, true, index, world);
     }
 
-    pub fn on_feed(&mut self, is_drink: bool, index: &AnimationIndex, world: &mut World) {
-        self.request_state(ActionState::Eating { is_drink }, true, index, world);
+    pub fn on_feed(
+        &mut self,
+        graph: impl Into<String>,
+        food_name: Option<String>,
+        icon_path: Option<PathBuf>,
+        index: &AnimationIndex,
+        world: &mut World,
+    ) {
+        self.request_state(
+            ActionState::Eating {
+                graph: graph.into(),
+                food_name,
+                icon_path,
+            },
+            true,
+            index,
+            world,
+        );
     }
 
     pub fn on_level_up(&mut self, index: &AnimationIndex, world: &mut World) {
@@ -633,9 +653,17 @@ impl InteractionController {
                 Some(1),
                 false,
             ),
-            ActionState::Eating { is_drink } => {
-                let name = if *is_drink { "drink" } else { "eat" };
-                resolve_chain_start(
+            ActionState::Eating {
+                graph,
+                food_name,
+                icon_path,
+            } => {
+                let name = match graph.to_ascii_lowercase().as_str() {
+                    "drink" => "drink",
+                    "gift" => "gift",
+                    _ => "eat",
+                };
+                if let Some((entry, phase, name_opt)) = resolve_chain_start(
                     index,
                     GraphType::Common,
                     Some(name),
@@ -643,7 +671,35 @@ impl InteractionController {
                     seed,
                     Some(1),
                     false,
-                )
+                ) {
+                    let mut source = entry.source.clone();
+                    if let AnimationSource::Food { item_icon_path, .. } = &mut source {
+                        *item_icon_path = icon_path.clone();
+                    }
+                    let cache_key = if let Some(fn_name) = food_name {
+                        format!(
+                            "{}:{}:{}",
+                            clip_cache_key(entry, self.target_px),
+                            fn_name,
+                            self.target_px
+                        )
+                    } else {
+                        clip_cache_key(entry, self.target_px)
+                    };
+                    self.active_clip = Some(ActiveClip {
+                        cache_key,
+                        graph_type: entry.graph_type,
+                        name: name_opt,
+                        mode,
+                        phase,
+                        source,
+                        frame_index: 0,
+                        frame_elapsed_ms: 0,
+                        seed,
+                    });
+                    return;
+                }
+                None
             }
             ActionState::LevelUp => resolve_chain_start(
                 index,
@@ -1014,8 +1070,8 @@ mod tests {
         assert_eq!(ctrl.state(), &ActionState::Pinch);
 
         // Test feeding triggers Eating animation state
-        ctrl.on_feed(false, &idx, &mut world);
-        assert_eq!(ctrl.state(), &ActionState::Eating { is_drink: false });
+        ctrl.on_feed("eat", Some("Apple".to_owned()), None, &idx, &mut world);
+        assert!(matches!(ctrl.state(), ActionState::Eating { .. }));
 
         // Test level up animation
         ctrl.on_level_up(&idx, &mut world);

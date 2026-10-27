@@ -139,55 +139,83 @@ impl RuntimeState {
 
     fn feed_by_name(&mut self, query: &str) -> std::result::Result<String, String> {
         let now_unix = unix_now();
-        let effect = if query.eq_ignore_ascii_case("water") || query.eq_ignore_ascii_case("drink") {
-            self.content
+        let (effect, icon_path, graph) = if query.eq_ignore_ascii_case("water")
+            || query.eq_ignore_ascii_case("drink")
+        {
+            let found = self
+                .content
                 .foods
                 .all()
                 .into_iter()
                 .filter(|f| f.strength_drink > f.strength_food)
-                .find(|f| f.price <= self.world.pet.money)
-                .map(food_item_to_effect)
-                .unwrap_or_else(|| FoodEffect {
-                    name: "Pure Water".to_owned(),
-                    price: 0.0,
-                    exp: 2.0,
-                    strength: 5.0,
-                    strength_food: 0.0,
-                    strength_drink: 40.0,
-                    feeling: 5.0,
-                    health: 1.0,
-                    likability: 0.5,
-                    buff_id: None,
-                    buff_time_mins: 0,
-                })
+                .find(|f| f.price <= self.world.pet.money);
+            match found {
+                Some(f) => (
+                    food_item_to_effect(f),
+                    f.image_path.clone(),
+                    f.graph.clone(),
+                ),
+                None => (
+                    FoodEffect {
+                        name: "Pure Water".to_owned(),
+                        price: 0.0,
+                        exp: 2.0,
+                        strength: 5.0,
+                        strength_food: 0.0,
+                        strength_drink: 40.0,
+                        feeling: 5.0,
+                        health: 1.0,
+                        likability: 0.5,
+                        buff_id: None,
+                        buff_time_mins: 0,
+                    },
+                    None,
+                    "drink".to_owned(),
+                ),
+            }
         } else if query.eq_ignore_ascii_case("snack")
             || query.eq_ignore_ascii_case("food")
             || query.eq_ignore_ascii_case("meal")
             || query.eq_ignore_ascii_case("apple")
         {
-            self.content
+            let found = self
+                .content
                 .foods
                 .all()
                 .into_iter()
                 .filter(|f| f.strength_food >= f.strength_drink)
-                .find(|f| f.price <= self.world.pet.money)
-                .map(food_item_to_effect)
-                .unwrap_or_else(default_snack_effect)
+                .find(|f| f.price <= self.world.pet.money);
+            match found {
+                Some(f) => (
+                    food_item_to_effect(f),
+                    f.image_path.clone(),
+                    f.graph.clone(),
+                ),
+                None => (default_snack_effect(), None, "eat".to_owned()),
+            }
         } else if let Some(item) = self.content.foods.get(query) {
-            food_item_to_effect(item)
+            (
+                food_item_to_effect(item),
+                item.image_path.clone(),
+                item.graph.clone(),
+            )
         } else {
             return Err(format!("unknown food item `{query}`"));
         };
 
         let label = effect.name.clone();
-        let is_drink = effect.strength_drink > effect.strength_food;
         let gained_levels = self
             .world
             .feed(&effect, now_unix)
             .map_err(|e| e.to_string())?;
         self.anim.show_bubble(format!("Yum! ({label})"), 3_000);
-        self.anim
-            .on_feed(is_drink, &self.anim_index, &mut self.world);
+        self.anim.on_feed(
+            graph,
+            Some(label.clone()),
+            icon_path,
+            &self.anim_index,
+            &mut self.world,
+        );
         if gained_levels > 0 {
             self.anim.on_level_up(&self.anim_index, &mut self.world);
         }
