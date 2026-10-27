@@ -312,6 +312,7 @@ mod tests {
         let db = ContentDatabase::load_root(root);
         assert!(db.pets.contains_key("vup"));
         assert!(db.animations.get("vup").is_some_and(|a| a.len() > 150));
+        assert_eq!(db.foods.len(), 151);
         assert!(db.foods.get("Fruit Juice").is_some());
         assert!(db.foods.get("Cola").is_some());
         assert!(!db.texts.click_texts().is_empty());
