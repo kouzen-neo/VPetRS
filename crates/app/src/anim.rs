@@ -508,12 +508,19 @@ impl InteractionController {
         }
 
         self.ensure_clip(index, world);
-        let fallback_durs = [125_u32];
-        let durs = frame_durations_ms
-            .filter(|s| !s.is_empty())
-            .unwrap_or(&fallback_durs);
 
         let Some(clip) = self.active_clip.as_mut() else {
+            return;
+        };
+
+        // If real frame durations are not available yet from cache (e.g. background worker is decoding),
+        // wait for the clip to finish decoding rather than prematurely finishing in 125ms!
+        let Some(durs) = frame_durations_ms.filter(|s| !s.is_empty()) else {
+            clip.frame_elapsed_ms = clip.frame_elapsed_ms.saturating_add(dt_ms);
+            // Safety timeout: if still not loaded after 5 seconds, finish the transient state
+            if clip.frame_elapsed_ms >= 5000 {
+                self.finish_transient_state(index, world);
+            }
             return;
         };
 

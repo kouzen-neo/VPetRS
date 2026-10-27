@@ -340,5 +340,19 @@ mod tests {
             assert_eq!(clip.byte_size, 2 * 250 * 250 * 4);
             assert!(start.elapsed().as_millis() < 2_000);
         }
+
+        let vup_dir = Path::new("/home/kouzen/Documents/VPet/VPet-Simulator.Windows/mod/0000_core/pet/vup");
+        if vup_dir.is_dir() {
+            let idx = vpet_content::AnimationIndex::scan_pet_dir("vup", vup_dir);
+            for name in ["drink", "eat", "gift"] {
+                for mode in [ModeType::Nomal, ModeType::Happy, ModeType::PoorCondition, ModeType::Ill] {
+                    let entry = idx.pick(vpet_content::GraphType::Common, Some(name), vpet_content::AnimatType::Single, mode, 0)
+                        .unwrap_or_else(|| panic!("failed to find {name} animation for mode {:?}", mode));
+                    let clip = decode_animation_source(name, &entry.source, 250)
+                        .unwrap_or_else(|e| panic!("failed to decode {name} for mode {:?}: {}", mode, e));
+                    assert!(!clip.frames.is_empty(), "{name} clip for mode {:?} had 0 frames", mode);
+                }
+            }
+        }
     }
 }

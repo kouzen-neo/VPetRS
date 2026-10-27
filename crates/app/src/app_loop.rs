@@ -139,25 +139,39 @@ impl RuntimeState {
 
     fn feed_by_name(&mut self, query: &str) -> std::result::Result<String, String> {
         let now_unix = unix_now();
-        let (effect, icon_path, graph) = if query.eq_ignore_ascii_case("water")
-            || query.eq_ignore_ascii_case("drink")
-        {
+        let (effect, icon_path, graph) = if query.eq_ignore_ascii_case("water") {
+            let water_icon = self
+                .content
+                .foods
+                .get("Mineral Water")
+                .or_else(|| self.content.foods.get("1L Pure Water"))
+                .and_then(|f| f.image_path.clone());
+
             let found = self
                 .content
                 .foods
                 .all()
                 .into_iter()
-                .filter(|f| f.strength_drink > f.strength_food)
-                .find(|f| f.price <= self.world.pet.money);
+                .filter(|f| f.graph == "drink" && f.name.to_lowercase().contains("water"))
+                .find(|f| f.price <= self.world.pet.money)
+                .or_else(|| {
+                    self.content
+                        .foods
+                        .all()
+                        .into_iter()
+                        .filter(|f| f.graph == "drink")
+                        .find(|f| f.price <= self.world.pet.money)
+                });
+
             match found {
                 Some(f) => (
                     food_item_to_effect(f),
-                    f.image_path.clone(),
-                    f.graph.clone(),
+                    f.image_path.clone().or_else(|| water_icon.clone()),
+                    "drink".to_owned(),
                 ),
                 None => (
                     FoodEffect {
-                        name: "Pure Water".to_owned(),
+                        name: "Mineral Water".to_owned(),
                         price: 0.0,
                         exp: 2.0,
                         strength: 5.0,
@@ -169,7 +183,44 @@ impl RuntimeState {
                         buff_id: None,
                         buff_time_mins: 0,
                     },
-                    None,
+                    water_icon,
+                    "drink".to_owned(),
+                ),
+            }
+        } else if query.eq_ignore_ascii_case("drink") {
+            let water_icon = self
+                .content
+                .foods
+                .get("Mineral Water")
+                .and_then(|f| f.image_path.clone());
+            let found = self
+                .content
+                .foods
+                .all()
+                .into_iter()
+                .filter(|f| f.graph == "drink")
+                .find(|f| f.price <= self.world.pet.money);
+            match found {
+                Some(f) => (
+                    food_item_to_effect(f),
+                    f.image_path.clone(),
+                    "drink".to_owned(),
+                ),
+                None => (
+                    FoodEffect {
+                        name: "Mineral Water".to_owned(),
+                        price: 0.0,
+                        exp: 2.0,
+                        strength: 5.0,
+                        strength_food: 0.0,
+                        strength_drink: 40.0,
+                        feeling: 5.0,
+                        health: 1.0,
+                        likability: 0.5,
+                        buff_id: None,
+                        buff_time_mins: 0,
+                    },
+                    water_icon,
                     "drink".to_owned(),
                 ),
             }
@@ -183,13 +234,13 @@ impl RuntimeState {
                 .foods
                 .all()
                 .into_iter()
-                .filter(|f| f.strength_food >= f.strength_drink)
+                .filter(|f| f.graph == "eat")
                 .find(|f| f.price <= self.world.pet.money);
             match found {
                 Some(f) => (
                     food_item_to_effect(f),
                     f.image_path.clone(),
-                    f.graph.clone(),
+                    "eat".to_owned(),
                 ),
                 None => (default_snack_effect(), None, "eat".to_owned()),
             }
@@ -208,7 +259,12 @@ impl RuntimeState {
             .world
             .feed(&effect, now_unix)
             .map_err(|e| e.to_string())?;
-        self.anim.show_bubble(format!("Yum! ({label})"), 3_000);
+        let msg = if graph == "drink" {
+            format!("Gulp gulp... ({label})")
+        } else {
+            format!("Yum! ({label})")
+        };
+        self.anim.show_bubble(msg, 3_000);
         self.anim.on_feed(
             graph,
             Some(label.clone()),
@@ -1081,15 +1137,20 @@ fn preload_essential_clips(
     let seed = world.rng.state();
     let mode = world.pet.mode;
     let specs = [
-        (GraphType::Sleep, AnimatType::AStart),
-        (GraphType::Sleep, AnimatType::BLoop),
-        (GraphType::TouchHead, AnimatType::AStart),
-        (GraphType::TouchHead, AnimatType::BLoop),
-        (GraphType::TouchBody, AnimatType::AStart),
-        (GraphType::RaisedDynamic, AnimatType::Single),
+        (GraphType::Sleep, None, AnimatType::AStart),
+        (GraphType::Sleep, None, AnimatType::BLoop),
+        (GraphType::TouchHead, None, AnimatType::AStart),
+        (GraphType::TouchHead, None, AnimatType::BLoop),
+        (GraphType::TouchBody, None, AnimatType::AStart),
+        (GraphType::RaisedDynamic, None, AnimatType::Single),
+        (GraphType::Common, Some("eat"), AnimatType::Single),
+        (GraphType::Common, Some("drink"), AnimatType::Single),
+        (GraphType::Common, Some("gift"), AnimatType::Single),
+        (GraphType::Common, Some("pinch"), AnimatType::Single),
+        (GraphType::Common, Some("levelup"), AnimatType::Single),
     ];
-    let items = specs.into_iter().filter_map(|(gt, animat)| {
-        let entry = index.pick(gt, None, animat, mode, seed)?;
+    let items = specs.into_iter().filter_map(|(gt, name, animat)| {
+        let entry = index.pick(gt, name, animat, mode, seed)?;
         Some((clip_cache_key(entry, sprite_px), entry.source.clone()))
     });
     loader.preload(items, cache, sprite_px);

@@ -1144,5 +1144,25 @@ mod tests {
             )
             .is_empty()
         );
+        assert!(
+            !idx.query(
+                GraphType::Common,
+                Some("drink"),
+                AnimatType::Single,
+                ModeType::Nomal
+            )
+            .is_empty(),
+            "drink animation must be queryable in Nomal mode"
+        );
+        assert!(
+            !idx.query(
+                GraphType::Common,
+                Some("eat"),
+                AnimatType::Single,
+                ModeType::Nomal
+            )
+            .is_empty(),
+            "eat animation must be queryable in Nomal mode"
+        );
     }
 }
