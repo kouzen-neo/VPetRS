@@ -38,6 +38,7 @@ pub enum IpcRequest {
     ListWorks,
     Work { name: Option<String> },
     CancelWork,
+    ListFoods { category: Option<String> },
     SideHide { left: Option<bool> },
     Reload,
     Status,
@@ -244,6 +245,11 @@ fn validate_request(req: IpcRequest) -> std::result::Result<IpcRequest, String> 
             if name.trim().is_empty() || name.contains('/') || name.contains('\0') =>
         {
             return Err("invalid work task name".to_owned());
+        }
+        IpcRequest::ListFoods {
+            category: Some(cat),
+        } if cat.trim().is_empty() || cat.len() > 64 => {
+            return Err("invalid category filter".to_owned());
         }
         _ => {}
     }

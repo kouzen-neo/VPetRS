@@ -132,6 +132,13 @@ enum CtlAction {
     },
     /// Cancel the active work session
     CancelWork,
+    /// List available foods and items in the food store
+    #[command(alias = "foodstore")]
+    Foods {
+        /// Optional category filter (Meal, Drink, Snack, Drug, Functional, Gift)
+        #[arg(default_value = "")]
+        category: String,
+    },
     /// Trigger side hide / wall climbing animation at the screen edge
     #[command(alias = "sidehide")]
     SideHide {
@@ -222,6 +229,14 @@ fn try_main() -> Result<()> {
                     IpcRequest::Work { name: opt }
                 }
                 CtlAction::CancelWork => IpcRequest::CancelWork,
+                CtlAction::Foods { category } => {
+                    let opt = if category.trim().is_empty() {
+                        None
+                    } else {
+                        Some(category)
+                    };
+                    IpcRequest::ListFoods { category: opt }
+                }
                 CtlAction::SideHide { left, right } => {
                     let side = if left {
                         Some(true)

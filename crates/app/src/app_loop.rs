@@ -21,13 +21,15 @@ use vpet_render::{
 };
 use vpet_wayland::{LayerMode, SurfaceConfig, SurfaceEvent, WaylandShell};
 
+use std::sync::Arc;
+
 use crate::{
     anim::{AdvanceViewport, InteractionController, classify_hit_zone, clip_cache_key},
     config::{AppConfig, ConfigWatcher},
     ipc::{IpcRequest, IpcResponse, IpcServer, StatusData},
     paths::{AppPaths, InstanceLock},
     persistence::SaveStore,
-    tray::{TrayCommand, TrayController, TraySnapshot},
+    tray::{TrayCommand, TrayController, TrayFoodItem, TraySnapshot},
 };
 
 #[derive(Debug, Default)]
@@ -61,6 +63,11 @@ struct RuntimeState {
     anim: InteractionController,
     shell: WaylandShell,
     tray: Option<TrayController>,
+    tray_meals: Arc<Vec<TrayFoodItem>>,
+    tray_drinks: Arc<Vec<TrayFoodItem>>,
+    tray_snacks: Arc<Vec<TrayFoodItem>>,
+    tray_drugs: Arc<Vec<TrayFoodItem>>,
+    tray_gifts: Arc<Vec<TrayFoodItem>>,
     ai_worker: crate::ai::AiWorker,
 
     last_clip_key: String,
@@ -104,6 +111,7 @@ impl RuntimeState {
                     self.world.pet.mode.as_str()
                 ),
                 pet_level: self.world.pet.level,
+                pet_money: self.world.pet.money,
                 visible: self.shell.visible(),
                 click_through: self.shell.click_through(),
                 overlay: self.shell.layer_mode() == LayerMode::Overlay,
@@ -112,6 +120,11 @@ impl RuntimeState {
                 auto_work: self.config.simulation.auto_work,
                 active_work,
                 available_works,
+                meals: self.tray_meals.clone(),
+                drinks: self.tray_drinks.clone(),
+                snacks: self.tray_snacks.clone(),
+                drugs: self.tray_drugs.clone(),
+                gifts: self.tray_gifts.clone(),
                 ai_enabled: self.config.ai.enabled,
             });
         }
@@ -554,6 +567,45 @@ impl RuntimeState {
                 self.shell.present();
                 IpcResponse::success(serde_json::json!({ "canceled": canceled }))
             }
+            IpcRequest::ListFoods { category } => {
+                let cat_filter = category.as_deref().map(str::to_ascii_lowercase);
+                let money = self.world.pet.money;
+                let mut foods: Vec<_> = self
+                    .content
+                    .foods
+                    .all()
+                    .into_iter()
+                    .filter(|f| {
+                        cat_filter
+                            .as_deref()
+                            .is_none_or(|c| f.category.to_ascii_lowercase() == c)
+                    })
+                    .map(|f| {
+                        serde_json::json!({
+                            "name": f.name,
+                            "category": f.category,
+                            "price": f.price,
+                            "food": f.strength_food,
+                            "drink": f.strength_drink,
+                            "stamina": f.strength,
+                            "feeling": f.feeling,
+                            "health": f.health,
+                            "exp": f.exp,
+                            "affordable": f.price <= money,
+                        })
+                    })
+                    .collect();
+                foods.sort_by(|a, b| {
+                    let pa = a["price"].as_f64().unwrap_or(0.0);
+                    let pb = b["price"].as_f64().unwrap_or(0.0);
+                    pa.partial_cmp(&pb).unwrap_or(std::cmp::Ordering::Equal)
+                });
+                IpcResponse::success(serde_json::json!({
+                    "money": money,
+                    "count": foods.len(),
+                    "foods": foods,
+                }))
+            }
             IpcRequest::SideHide { left } => {
                 let bounds = self.shell.output_logical_size();
                 let sprite_logical = self.shell.sprite_logical_size();
@@ -642,6 +694,11 @@ impl RuntimeState {
             }
             TrayCommand::GiveWater => {
                 let _ = self.feed_by_name("water");
+                self.refresh_visuals();
+                self.shell.present();
+            }
+            TrayCommand::FeedItem(name) => {
+                let _ = self.feed_by_name(&name);
                 self.refresh_visuals();
                 self.shell.present();
             }
@@ -854,6 +911,13 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
         )
         .map_err(|e| anyhow::anyhow!("failed to register IPC source: {e}"))?;
 
+    // Categorize food items for the tray food store once.
+    let tray_meals = categorize_food_items(&content.foods, "meal");
+    let tray_drinks = categorize_food_items(&content.foods, "drink");
+    let tray_snacks = categorize_food_items(&content.foods, "snack");
+    let tray_drugs = categorize_food_items(&content.foods, "drug");
+    let tray_gifts = categorize_gifts_and_functional(&content.foods);
+
     // Spawn StatusNotifierItem tray (unless disabled in headless test).
     let (tray_tx, tray_rx) = channel::channel::<TrayCommand>();
     let tray = (!overrides.disable_tray).then(|| {
@@ -866,6 +930,7 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
                     world.pet.mode.as_str()
                 ),
                 pet_level: world.pet.level,
+                pet_money: world.pet.money,
                 visible: true,
                 click_through: shell.click_through(),
                 overlay: shell.layer_mode() == LayerMode::Overlay,
@@ -878,6 +943,11 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
                     .iter()
                     .map(|w| (w.name.clone(), w.level_limit))
                     .collect(),
+                meals: tray_meals.clone(),
+                drinks: tray_drinks.clone(),
+                snacks: tray_snacks.clone(),
+                drugs: tray_drugs.clone(),
+                gifts: tray_gifts.clone(),
                 ai_enabled: config.ai.enabled,
             },
             tray_tx,
@@ -1171,6 +1241,11 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
         anim,
         shell,
         tray,
+        tray_meals,
+        tray_drinks,
+        tray_snacks,
+        tray_drugs,
+        tray_gifts,
         ai_worker,
         last_clip_key: String::new(),
         last_frame_idx: usize::MAX,
@@ -1181,6 +1256,7 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
         shutdown_deadline: None,
         running: true,
     };
+    state.sync_tray();
 
     while state.running && !state.shell.is_closed() {
         event_loop.dispatch(None, &mut state)?;
@@ -1258,6 +1334,49 @@ fn food_item_to_effect(item: &FoodItem) -> FoodEffect {
         buff_id: item.buff.clone(),
         buff_time_mins: item.buff_time_mins,
     }
+}
+
+fn categorize_food_items(
+    foods: &vpet_content::FoodDatabase,
+    category: &str,
+) -> Arc<Vec<TrayFoodItem>> {
+    let mut items: Vec<_> = foods
+        .all()
+        .into_iter()
+        .filter(|f| f.category.eq_ignore_ascii_case(category) && !f.name.trim().is_empty())
+        .map(|f| TrayFoodItem {
+            name: f.name.clone(),
+            price: f.price,
+        })
+        .collect();
+    items.sort_by(|a, b| {
+        a.price
+            .partial_cmp(&b.price)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    Arc::new(items)
+}
+
+fn categorize_gifts_and_functional(foods: &vpet_content::FoodDatabase) -> Arc<Vec<TrayFoodItem>> {
+    let mut items: Vec<_> = foods
+        .all()
+        .into_iter()
+        .filter(|f| {
+            (f.category.eq_ignore_ascii_case("gift")
+                || f.category.eq_ignore_ascii_case("functional"))
+                && !f.name.trim().is_empty()
+        })
+        .map(|f| TrayFoodItem {
+            name: f.name.clone(),
+            price: f.price,
+        })
+        .collect();
+    items.sort_by(|a, b| {
+        a.price
+            .partial_cmp(&b.price)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    Arc::new(items)
 }
 
 fn default_snack_effect() -> FoodEffect {

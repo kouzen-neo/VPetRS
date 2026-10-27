@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [v1.5.1] - 2026-10-28
+
+### Added
+
+- **Full Waybar Tray Food Store & Categorized Buying (`vpet-app`)**:
+  - Added categorized `Food Store` submenu to the StatusNotifierItem (Waybar tray) menu with `Meals`, `Drinks`, `Snacks`, `Medicine`, and `Gifts & Fun`.
+  - Listed every store item with price (e.g. `Hamburg ($28.00)`, `Cola ($10.00)`), automatically enabling affordable items and graying out items exceeding current funds.
+  - Allowed direct buying and feeding from the tray menu, displaying the food name in the speech bubble and rendering the specific food item icon in the pet's hands.
+  - Added CLI command `vpet-rs ctl foods` (alias: `foodstore`) with optional category filter to inspect prices, nutrient restoration, and affordability.
+  - Retained quick one-click `Quick Snack` and `Quick Water` buttons in the tray menu.
+
 ## [v1.5.0] - 2026-10-27
 
 ### Added
