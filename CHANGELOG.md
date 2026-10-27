@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [v1.6.0] - 2026-10-28
+
+### Added
+
+- **Backpack Inventory System (`vpet-app`, `vpet-core`)**:
+  - Added ability to stockpile food items in the pet's backpack via `vpet-rs ctl buy <item> [count]`.
+  - Added backpack inspection command `vpet-rs ctl bag` (alias: `inventory`).
+  - Prioritized consuming items from the backpack for $0 before spending funds when feeding.
+  - Added interactive `Backpack` submenu to the Waybar StatusNotifierItem tray menu showing owned item stacks (e.g. `Hamburg (x3)`) with one-click consumption.
+- **Music Catch & Dancing Reactions (`vpet-app`, `vpet-content`)**:
+  - Connected canonical `Music` animation sets (`Music/A` AStart -> `Music/B` BLoop -> `Music/C` CEnd) across all pet modes.
+  - Added background MPRIS player audio detection (`crates/app/src/music.rs`): automatically triggers dancing when music or video plays while the pet is idle.
+  - Added CLI command `vpet-rs ctl dance` (alias: `music`) with configurable loop count.
+  - Added `Dance to Music` button to the Waybar tray menu.
+  - Preloaded essential `music` clips for 0ms start.
+
 ## [v1.5.1] - 2026-10-28
 
 ### Added

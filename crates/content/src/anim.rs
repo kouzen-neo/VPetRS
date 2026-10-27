@@ -1182,13 +1182,13 @@ mod tests {
         );
         assert!(
             !idx.query(
-                GraphType::SideHideRightMain,
-                None,
-                AnimatType::AStart,
+                GraphType::Common,
+                Some("music"),
+                AnimatType::BLoop,
                 ModeType::Nomal
             )
             .is_empty(),
-            "sidehide_right_main AStart must be queryable in Nomal mode"
+            "music BLoop must be queryable in Nomal mode"
         );
     }
 }

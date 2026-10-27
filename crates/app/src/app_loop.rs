@@ -29,7 +29,7 @@ use crate::{
     ipc::{IpcRequest, IpcResponse, IpcServer, StatusData},
     paths::{AppPaths, InstanceLock},
     persistence::SaveStore,
-    tray::{TrayCommand, TrayController, TrayFoodItem, TraySnapshot},
+    tray::{TrayCommand, TrayController, TrayFoodItem, TrayInventoryItem, TraySnapshot},
 };
 
 #[derive(Debug, Default)]
@@ -69,6 +69,7 @@ struct RuntimeState {
     tray_drugs: Arc<Vec<TrayFoodItem>>,
     tray_gifts: Arc<Vec<TrayFoodItem>>,
     ai_worker: crate::ai::AiWorker,
+    audio_monitor: crate::music::AudioMonitor,
 
     last_clip_key: String,
     last_frame_idx: usize,
@@ -103,6 +104,17 @@ impl RuntimeState {
                 .iter()
                 .map(|w| (w.name.clone(), w.level_limit))
                 .collect();
+            let backpack = Arc::new(
+                self.world
+                    .inventory
+                    .to_items()
+                    .into_iter()
+                    .map(|i| TrayInventoryItem {
+                        name: i.id,
+                        count: i.count,
+                    })
+                    .collect(),
+            );
             tray.sync(TraySnapshot {
                 title: format!(
                     "{} — Lv.{} ({})",
@@ -120,6 +132,7 @@ impl RuntimeState {
                 auto_work: self.config.simulation.auto_work,
                 active_work,
                 available_works,
+                backpack,
                 meals: self.tray_meals.clone(),
                 drinks: self.tray_drinks.clone(),
                 snacks: self.tray_snacks.clone(),
@@ -489,6 +502,63 @@ impl RuntimeState {
                 }
                 Err(msg) => IpcResponse::fail(msg),
             },
+            IpcRequest::Buy { item, count } => {
+                let Some(food) = self.content.foods.get(&item) else {
+                    return IpcResponse::fail(format!("unknown item `{item}`"));
+                };
+                let total_cost = food.price * f64::from(count);
+                if self.world.pet.money < total_cost {
+                    return IpcResponse::fail(format!(
+                        "insufficient funds: need ${total_cost:.2}, have ${:.2}",
+                        self.world.pet.money
+                    ));
+                }
+                self.world.pet.money -= total_cost;
+                let in_bag = self.world.inventory.add(&food.name, count);
+                self.anim
+                    .show_bubble(format!("Bought {count}x {}!", food.name), 3_000);
+                self.sync_tray();
+                IpcResponse::success(serde_json::json!({
+                    "bought": food.name,
+                    "count": count,
+                    "total_cost": total_cost,
+                    "in_bag": in_bag,
+                    "money": self.world.pet.money,
+                }))
+            }
+            IpcRequest::ListInventory => {
+                let items: Vec<_> = self
+                    .world
+                    .inventory
+                    .to_items()
+                    .into_iter()
+                    .map(|inv| {
+                        let food_info = self.content.foods.get(&inv.id);
+                        serde_json::json!({
+                            "name": inv.id,
+                            "count": inv.count,
+                            "price": food_info.map(|f| f.price).unwrap_or(0.0),
+                            "category": food_info.map(|f| f.category.as_str()).unwrap_or("Other"),
+                        })
+                    })
+                    .collect();
+                IpcResponse::success(serde_json::json!({
+                    "money": self.world.pet.money,
+                    "total_stacks": items.len(),
+                    "items": items,
+                }))
+            }
+            IpcRequest::Dance { loops } => {
+                let count = loops.unwrap_or(3).max(1);
+                self.anim.on_dance(count, &self.anim_index, &mut self.world);
+                self.anim.show_bubble("Dancing to the beat! ~", 4_000);
+                self.refresh_visuals();
+                self.shell.present();
+                IpcResponse::success(serde_json::json!({
+                    "dancing": true,
+                    "loops": count,
+                }))
+            }
             IpcRequest::Sleep => {
                 if !self.world.pet.sleeping {
                     self.anim.toggle_sleep(&self.anim_index, &mut self.world);
@@ -699,6 +769,12 @@ impl RuntimeState {
             }
             TrayCommand::FeedItem(name) => {
                 let _ = self.feed_by_name(&name);
+                self.refresh_visuals();
+                self.shell.present();
+            }
+            TrayCommand::Dance => {
+                self.anim.on_dance(3, &self.anim_index, &mut self.world);
+                self.anim.show_bubble("Dancing to the beat! ~", 4_000);
                 self.refresh_visuals();
                 self.shell.present();
             }
@@ -943,6 +1019,7 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
                     .iter()
                     .map(|w| (w.name.clone(), w.level_limit))
                     .collect(),
+                backpack: Arc::new(Vec::new()),
                 meals: tray_meals.clone(),
                 drinks: tray_drinks.clone(),
                 snacks: tray_snacks.clone(),
@@ -1166,6 +1243,16 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
                 state.shell.present();
             }
 
+            if let Some(status) = state.audio_monitor.poll_status()
+                && status == crate::music::MusicStatus::Playing
+                && matches!(state.anim.state(), crate::anim::ActionState::Idle)
+                && !state.world.pet.sleeping
+                && state.world.active_work.is_none()
+            {
+                state.anim.on_dance(4, &state.anim_index, &mut state.world);
+                state.anim.show_bubble("Dancing to the music! ~", 4_000);
+            }
+
             let mut pos = state.shell.position();
             let out_name = state.shell.active_output_name().to_owned();
             let bounds = state.shell.output_logical_size();
@@ -1222,6 +1309,7 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
 
     let watcher = ConfigWatcher::new(paths.config_file.clone());
     let ai_worker = crate::ai::AiWorker::spawn(config.ai.clone());
+    let audio_monitor = crate::music::AudioMonitor::spawn();
     let mut state = RuntimeState {
         paths,
         config,
@@ -1247,6 +1335,7 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
         tray_drugs,
         tray_gifts,
         ai_worker,
+        audio_monitor,
         last_clip_key: String::new(),
         last_frame_idx: usize::MAX,
         last_bubble: None,
@@ -1300,6 +1389,8 @@ fn preload_essential_clips(
         (GraphType::Common, Some("gift"), AnimatType::Single),
         (GraphType::Common, Some("pinch"), AnimatType::Single),
         (GraphType::Common, Some("levelup"), AnimatType::Single),
+        (GraphType::Common, Some("music"), AnimatType::AStart),
+        (GraphType::Common, Some("music"), AnimatType::BLoop),
         (GraphType::SideHideLeftMain, None, AnimatType::AStart),
         (GraphType::SideHideLeftMain, None, AnimatType::BLoop),
         (GraphType::SideHideLeftMain, None, AnimatType::CEnd),

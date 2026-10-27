@@ -90,6 +90,9 @@ pub enum ActionState {
         left: bool,
         emerging: bool,
     },
+    Dancing {
+        loops_remaining: u32,
+    },
     Saying,
     Thinking,
     Working {
@@ -123,6 +126,7 @@ impl ActionState {
             Self::StateOne => 25,
             Self::Moving { .. } => 30,
             Self::SideHide { .. } => 35,
+            Self::Dancing { .. } => 36,
             Self::Saying => 40,
             Self::Thinking => 45,
             Self::Working { .. } => 50,
@@ -245,6 +249,17 @@ impl InteractionController {
 
     pub fn on_think(&mut self, index: &AnimationIndex, world: &mut World) {
         self.request_state(ActionState::Thinking, false, index, world);
+    }
+
+    pub fn on_dance(&mut self, loops: u32, index: &AnimationIndex, world: &mut World) {
+        self.request_state(
+            ActionState::Dancing {
+                loops_remaining: loops.max(1),
+            },
+            true,
+            index,
+            world,
+        );
     }
 
     pub fn on_switch(&mut self, kind: SwitchKind, index: &AnimationIndex, world: &mut World) {
@@ -691,6 +706,15 @@ impl InteractionController {
             ActionState::Saying => {
                 resolve_chain_start(index, GraphType::Say, None, mode, seed, Some(1), false)
             }
+            ActionState::Dancing { loops_remaining } => resolve_chain_start(
+                index,
+                GraphType::Common,
+                Some("music"),
+                mode,
+                seed,
+                Some(*loops_remaining),
+                false,
+            ),
             ActionState::Thinking => resolve_chain_start(
                 index,
                 GraphType::Common,
@@ -830,6 +854,7 @@ impl InteractionController {
                     | ActionState::StartUp
                     | ActionState::Saying
                     | ActionState::Thinking
+                    | ActionState::Dancing { .. }
             )
         {
             self.finish_transient_state(index, world);
@@ -845,6 +870,7 @@ impl InteractionController {
             ActionState::Touch { .. } | ActionState::Saying | ActionState::SideHide { .. } => {
                 Some(1)
             }
+            ActionState::Dancing { loops_remaining } => Some(*loops_remaining),
             ActionState::Moving {
                 loops_remaining, ..
             } => Some(*loops_remaining),
@@ -1169,6 +1195,10 @@ mod tests {
         // Test level up animation
         ctrl.on_level_up(&idx, &mut world);
         assert_eq!(ctrl.state(), &ActionState::LevelUp);
+
+        // Test dance animation
+        ctrl.on_dance(2, &idx, &mut world);
+        assert!(matches!(ctrl.state(), ActionState::Dancing { .. }));
 
         // Test startup & shutdown
         ctrl.request_state(ActionState::StartUp, true, &idx, &mut world);

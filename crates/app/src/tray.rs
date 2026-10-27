@@ -18,6 +18,7 @@ pub enum TrayCommand {
     FeedSnack,
     GiveWater,
     FeedItem(String),
+    Dance,
     StartWork(String),
     CancelWork,
     PromptAiChat,
@@ -29,6 +30,12 @@ pub enum TrayCommand {
 pub struct TrayFoodItem {
     pub name: String,
     pub price: f64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TrayInventoryItem {
+    pub name: String,
+    pub count: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -44,6 +51,7 @@ pub struct TraySnapshot {
     pub auto_work: bool,
     pub active_work: Option<(String, u32)>,
     pub available_works: Vec<(String, u32)>,
+    pub backpack: Arc<Vec<TrayInventoryItem>>,
     pub meals: Arc<Vec<TrayFoodItem>>,
     pub drinks: Arc<Vec<TrayFoodItem>>,
     pub snacks: Arc<Vec<TrayFoodItem>>,
@@ -66,6 +74,7 @@ impl Default for TraySnapshot {
             auto_work: false,
             active_work: None,
             available_works: Vec::new(),
+            backpack: Arc::new(Vec::new()),
             meals: Arc::new(Vec::new()),
             drinks: Arc::new(Vec::new()),
             snacks: Arc::new(Vec::new()),
@@ -265,6 +274,56 @@ impl ksni::Tray for VPetTray {
                 .into(),
             );
         }
+
+        // Backpack (Inventory) section
+        let mut bag_items: Vec<ksni::MenuItem<Self>> = self
+            .snap
+            .backpack
+            .iter()
+            .map(|item| {
+                let owned_name = item.name.clone();
+                let label = format!("{} (x{})", item.name, item.count);
+                StandardItem {
+                    label,
+                    activate: Box::new(move |this: &mut Self| {
+                        let _ = this.tx.send(TrayCommand::FeedItem(owned_name.clone()));
+                    }),
+                    ..Default::default()
+                }
+                .into()
+            })
+            .collect();
+
+        if bag_items.is_empty() {
+            bag_items.push(
+                StandardItem {
+                    label: "(Empty)".to_owned(),
+                    enabled: false,
+                    ..Default::default()
+                }
+                .into(),
+            );
+        }
+
+        items.push(
+            SubMenu {
+                label: format!("Backpack ({})", self.snap.backpack.len()),
+                submenu: bag_items,
+                ..Default::default()
+            }
+            .into(),
+        );
+
+        items.push(
+            StandardItem {
+                label: "Dance to Music".to_owned(),
+                activate: Box::new(|this: &mut Self| {
+                    let _ = this.tx.send(TrayCommand::Dance);
+                }),
+                ..Default::default()
+            }
+            .into(),
+        );
 
         // Work / Study / Play section
         if let Some((work_name, rem_mins)) = &self.snap.active_work {

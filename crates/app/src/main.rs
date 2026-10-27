@@ -7,6 +7,7 @@ pub mod config;
 pub mod import;
 pub mod ipc;
 pub mod logging;
+pub mod music;
 pub mod paths;
 pub mod persistence;
 pub mod tray;
@@ -113,6 +114,25 @@ enum CtlAction {
         #[arg(default_value = "snack")]
         item: String,
     },
+    /// Buy an item into the backpack inventory without consuming it immediately
+    Buy {
+        /// Name of the item to purchase
+        item: String,
+
+        /// Number of units to buy (1..=99)
+        #[arg(default_value_t = 1)]
+        count: u32,
+    },
+    /// List items stored in the backpack inventory
+    #[command(alias = "inventory")]
+    Bag,
+    /// Trigger music dancing animation
+    #[command(alias = "music")]
+    Dance {
+        /// Number of dance loops (default: 3)
+        #[arg(default_value_t = 3)]
+        loops: u32,
+    },
     /// Put the pet to sleep
     Sleep,
     /// Wake the pet up
@@ -214,6 +234,9 @@ fn try_main() -> Result<()> {
                 CtlAction::ToggleAutowork => IpcRequest::ToggleAutoWork,
                 CtlAction::Layer { mode } => IpcRequest::Layer { mode },
                 CtlAction::Feed { item } => IpcRequest::Feed { item },
+                CtlAction::Buy { item, count } => IpcRequest::Buy { item, count },
+                CtlAction::Bag => IpcRequest::ListInventory,
+                CtlAction::Dance { loops } => IpcRequest::Dance { loops: Some(loops) },
                 CtlAction::Sleep => IpcRequest::Sleep,
                 CtlAction::Wake => IpcRequest::Wake,
                 CtlAction::Say { text } => IpcRequest::Say { text },

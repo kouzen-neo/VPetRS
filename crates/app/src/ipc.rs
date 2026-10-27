@@ -28,6 +28,9 @@ pub enum IpcRequest {
     ToggleClickthrough,
     Layer { mode: String },
     Feed { item: String },
+    Buy { item: String, count: u32 },
+    ListInventory,
+    Dance { loops: Option<u32> },
     Sleep,
     Wake,
     ToggleSelfCare,
@@ -229,6 +232,15 @@ fn validate_request(req: IpcRequest) -> std::result::Result<IpcRequest, String> 
             if item.trim().is_empty() || item.contains('/') || item.contains('\0') =>
         {
             return Err("invalid item identifier".to_owned());
+        }
+        IpcRequest::Buy { item, count }
+            if item.trim().is_empty()
+                || item.contains('/')
+                || item.contains('\0')
+                || *count == 0
+                || *count > 99 =>
+        {
+            return Err("invalid buy item or count (must be 1..=99)".to_owned());
         }
         IpcRequest::Say { text } if text.trim().is_empty() || text.len() > 512 => {
             return Err("speech bubble text must be 1..=512 bytes".to_owned());
