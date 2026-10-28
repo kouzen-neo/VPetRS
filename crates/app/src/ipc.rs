@@ -43,6 +43,8 @@ pub enum IpcRequest {
     CancelWork,
     ListFoods { category: Option<String> },
     SideHide { left: Option<bool> },
+    Climb { side: Option<String> },
+    Bday,
     Reload,
     Status,
     Quit,

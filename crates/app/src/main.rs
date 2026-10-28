@@ -170,6 +170,14 @@ enum CtlAction {
         #[arg(long)]
         right: bool,
     },
+    /// Climb the wall or ceiling (left, right, or top)
+    Climb {
+        /// Wall to climb: `left`, `right`, or `top` (default: auto closest)
+        #[arg(default_value = "auto")]
+        side: String,
+    },
+    /// Play Happy Birthday celebration animation
+    Bday,
     /// Reload `config.toml` without restarting
     Reload,
     /// Print daemon & pet status JSON
@@ -270,6 +278,15 @@ fn try_main() -> Result<()> {
                     };
                     IpcRequest::SideHide { left: side }
                 }
+                CtlAction::Climb { side } => {
+                    let opt = if side.trim().is_empty() || side.eq_ignore_ascii_case("auto") {
+                        None
+                    } else {
+                        Some(side)
+                    };
+                    IpcRequest::Climb { side: opt }
+                }
+                CtlAction::Bday => IpcRequest::Bday,
                 CtlAction::Reload => IpcRequest::Reload,
                 CtlAction::Status => IpcRequest::Status,
                 CtlAction::Quit => IpcRequest::Quit,

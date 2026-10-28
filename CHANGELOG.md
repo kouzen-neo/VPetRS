@@ -6,15 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [v1.7.0] - 2026-10-28
+
+### Added
+
+- **Scrollable In-Surface Food Store & Backpack (`vpet-render`, `vpet-app`)**:
+  - Connected all 151 official foods to the desktop context menu's `Food Store` submenu, displaying item name, price, and category tag.
+  - Added smooth mouse wheel scrolling (`SurfaceEvent::Axis`) and interactive `▲ Scroll Up` / `▼ Scroll Down` pagination buttons to browse all 151 items seamlessly.
+  - Made the `Backpack` submenu scrollable for large inventories.
+  - Widened submenu card to 280 px to fit Everforest typography cleanly.
+- **Wall & Ceiling Climbing, Falling, and Crawling Physics (`vpet-app`, `vpet-content`)**:
+  - Connected canonical climbing movements (`climb.left`, `climb.right`, `climb.top.left`, `climb.top.right`), floor crawling (`crawl.left`, `crawl.right`), and ceiling falling physics (`fall.left`, `fall.right` with gravity landing).
+  - Automatically triggered wall climbing when hitting screen edges or when dropping a dragged pet near the top ceiling bezel.
+  - Added CLI command `vpet-rs ctl climb [left|right|top]` to manually trigger climbing.
+  - Added `vpet-rs ctl bday` command to trigger the `BDay` celebration animation sequence.
+  - Preloaded all climbing, falling, and birthday animations at startup.
+
 ### Fixed
 
+- **Dangling Animation While Picked Up / Dragged (`Raised_Dynamic`)**:
+  - Allowed animation frame advance timers to tick continuously during mouse drag instead of pausing, enabling the full 22-frame paddling/kicking leg animation while dangling.
 - **Level Up Queueing & Food Alias Resolution (`vpet-app`)**:
   - Prevented immediate `LevelUp` transitions from prematurely aborting active `Eating` animations when consuming high-EXP foods (such as Sirloin/steak); queued level up to play gracefully after eating finishes.
   - Added food aliases for common names (`steak` -> `Sirloin`, `burger` -> `Hamburger`, `coke` -> `Cola`, `pasta` -> `Tomato Pasta`, `fish` -> `Steamed Sea Bass`).
   - Added visual error feedback bubble when feeding fails from the tray menu instead of silently ignoring errors.
-
-### Added
-
 - **Everforest Desktop Context Menu with Hover Cascades (`vpet-render`, `vpet-app`)**:
   - Matched Waybar theme palette exactly (`#2D353B` background, `#D3C6AA` text, `#3D484D` hover pill).
   - Loaded `JetBrainsMono Nerd Font Propo` / `JetBrainsMono Nerd Font` for font parity with Waybar.

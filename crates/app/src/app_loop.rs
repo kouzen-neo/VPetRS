@@ -38,6 +38,8 @@ struct DesktopMenuState {
     active_submenu: Option<u32>,
     hovered_item_id: Option<u32>,
     rendered: RenderedMenu,
+    food_offset: usize,
+    backpack_offset: usize,
 }
 
 #[derive(Debug, Default)]
@@ -741,6 +743,57 @@ impl RuntimeState {
                     "position": [target_x, py],
                 }))
             }
+            IpcRequest::Climb { side } => {
+                let bounds = self.shell.output_logical_size();
+                let sprite_logical = self.shell.sprite_logical_size();
+                let max_x = (bounds.0 as i32 - sprite_logical.0 as i32).max(0);
+                let (px, py) = self.shell.position();
+                let offset_left = ((219_f32 * sprite_logical.0 as f32) / 500.0).round() as i32;
+                let offset_right =
+                    (((500.0 - 281_f32) * sprite_logical.0 as f32) / 500.0).round() as i32;
+
+                let (kind, pos_x, pos_y) =
+                    match side.as_deref().map(str::to_ascii_lowercase).as_deref() {
+                        Some("left") => (crate::anim::ClimbKind::LeftWall, -offset_left, py),
+                        Some("right") => {
+                            (crate::anim::ClimbKind::RightWall, max_x + offset_right, py)
+                        }
+                        Some("top") | Some("ceiling") => {
+                            let k = if px < max_x / 2 {
+                                crate::anim::ClimbKind::TopCeilingRight
+                            } else {
+                                crate::anim::ClimbKind::TopCeilingLeft
+                            };
+                            (k, px, 0)
+                        }
+                        _ => {
+                            if px < max_x / 2 {
+                                (crate::anim::ClimbKind::LeftWall, -offset_left, py)
+                            } else {
+                                (crate::anim::ClimbKind::RightWall, max_x + offset_right, py)
+                            }
+                        }
+                    };
+
+                self.shell.set_position(pos_x, pos_y);
+                self.world
+                    .output_positions
+                    .insert(self.shell.active_output_name().to_owned(), (pos_x, pos_y));
+                self.anim.on_climb(kind, &self.anim_index, &mut self.world);
+                self.refresh_visuals();
+                self.shell.present();
+                IpcResponse::success(serde_json::json!({
+                    "climbing": true,
+                    "kind": format!("{:?}", kind),
+                    "position": [pos_x, pos_y],
+                }))
+            }
+            IpcRequest::Bday => {
+                self.anim.on_bday(&self.anim_index, &mut self.world);
+                self.refresh_visuals();
+                self.shell.present();
+                IpcResponse::success(serde_json::json!({ "bday": true }))
+            }
             IpcRequest::Reload => {
                 let reloaded = AppConfig::load_or_default(&self.paths.config_file);
                 self.apply_reloaded_config(reloaded);
@@ -866,12 +919,15 @@ impl RuntimeState {
         let prim_entries = self.build_main_entries();
         let prim_w = self.menu_style.width as i32;
 
+        let food_offset = self.desktop_menu.as_ref().map_or(0, |m| m.food_offset);
+        let backpack_offset = self.desktop_menu.as_ref().map_or(0, |m| m.backpack_offset);
+
         let sub_data = active_submenu.and_then(|sub_id| {
             let entries = self.build_submenu_entries(sub_id);
             if entries.is_empty() {
                 return None;
             }
-            let sub_w = 240_u32;
+            let sub_w = 280_u32;
             let sub_x = if primary_pos.0 + prim_w + sub_w as i32 + 8 <= screen_w as i32 {
                 primary_pos.0 + prim_w - 2
             } else {
@@ -928,7 +984,53 @@ impl RuntimeState {
                 active_submenu,
                 hovered_item_id,
                 rendered,
+                food_offset,
+                backpack_offset,
             });
+        }
+    }
+
+    fn scroll_menu(&mut self, delta: i32) {
+        let Some(menu) = &self.desktop_menu else {
+            return;
+        };
+        let anchor = menu.anchor;
+        let prim_pos = menu.primary_pos;
+        let active_sub = menu.active_submenu;
+        let hovered = menu.hovered_item_id;
+
+        if active_sub == Some(10) {
+            let total = self.content.foods.len();
+            let page_size = 12;
+            let max_offset = total.saturating_sub(page_size);
+            let cur = menu.food_offset;
+            let next_offset = if delta > 0 {
+                (cur + delta as usize).min(max_offset)
+            } else {
+                cur.saturating_sub((-delta) as usize)
+            };
+            if next_offset != cur {
+                if let Some(m) = &mut self.desktop_menu {
+                    m.food_offset = next_offset;
+                }
+                self.update_menu_display(anchor, prim_pos, active_sub, hovered);
+            }
+        } else if active_sub == Some(11) {
+            let total = self.world.inventory.to_items().len();
+            let page_size = 12;
+            let max_offset = total.saturating_sub(page_size);
+            let cur = menu.backpack_offset;
+            let next_offset = if delta > 0 {
+                (cur + delta as usize).min(max_offset)
+            } else {
+                cur.saturating_sub((-delta) as usize)
+            };
+            if next_offset != cur {
+                if let Some(m) = &mut self.desktop_menu {
+                    m.backpack_offset = next_offset;
+                }
+                self.update_menu_display(anchor, prim_pos, active_sub, hovered);
+            }
         }
     }
 
@@ -944,7 +1046,8 @@ impl RuntimeState {
             10 => Some(10), // Food Store
             11 => Some(11), // Backpack
             13 => Some(13), // Work
-            1000..=3999 => current_sub,
+            998..=1999 => current_sub,
+            2000..=3999 => current_sub,
             _ => None,
         }
     }
@@ -1231,11 +1334,26 @@ impl RuntimeState {
         let mut entries = Vec::new();
         match sub_id {
             10 => {
-                // Food Store
+                // Food Store - all 151 foods, scrollable!
+                let mut all_foods = self.content.foods.all();
+                all_foods.sort_by(|a, b| {
+                    a.price
+                        .partial_cmp(&b.price)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
+                let total = all_foods.len();
+                let page_size = 12;
+                let offset = self
+                    .desktop_menu
+                    .as_ref()
+                    .map_or(0, |m| m.food_offset)
+                    .min(total.saturating_sub(1));
+
+                let end = (offset + page_size).min(total);
                 entries.push(MenuEntry {
                     id: 0,
                     label: format!("Food Store (${:.2})", self.world.pet.money),
-                    subtext: None,
+                    subtext: Some(format!("{}-{}/{}", offset + 1, end, total)),
                     checked: None,
                     disabled: false,
                     is_separator: false,
@@ -1243,25 +1361,26 @@ impl RuntimeState {
                     submenu_id: None,
                 });
 
-                let popular = [
-                    "Fruit Juice",
-                    "1L Pure Water",
-                    "Mineral Water",
-                    "Sandwich",
-                    "Bread",
-                    "Steak",
-                    "Cookie",
-                    "Cola",
-                    "Coffee",
-                    "Medicine",
-                ];
-                for (idx, name) in popular.iter().enumerate() {
-                    let price = self.content.foods.get(name).map_or(10.0, |f| f.price);
-                    let can_afford = self.world.pet.money >= price;
+                if offset > 0 {
                     entries.push(MenuEntry {
-                        id: 1000 + idx as u32,
-                        label: (*name).to_owned(),
-                        subtext: Some(format!("${price:.1}")),
+                        id: 998,
+                        label: "▲ Scroll Up".to_owned(),
+                        subtext: Some(format!("(-{})", offset.min(page_size))),
+                        checked: None,
+                        disabled: false,
+                        is_separator: false,
+                        is_header: false,
+                        submenu_id: None,
+                    });
+                }
+
+                for (idx, f) in all_foods[offset..end].iter().enumerate() {
+                    let actual_idx = offset + idx;
+                    let can_afford = self.world.pet.money >= f.price;
+                    entries.push(MenuEntry {
+                        id: 1000 + actual_idx as u32,
+                        label: f.name.clone(),
+                        subtext: Some(format!("${:.1} • {}", f.price, f.category)),
                         checked: None,
                         disabled: !can_afford,
                         is_separator: false,
@@ -1269,13 +1388,40 @@ impl RuntimeState {
                         submenu_id: None,
                     });
                 }
+
+                if end < total {
+                    entries.push(MenuEntry {
+                        id: 999,
+                        label: "▼ Scroll Down".to_owned(),
+                        subtext: Some(format!("(+{})", (total - end).min(page_size))),
+                        checked: None,
+                        disabled: false,
+                        is_separator: false,
+                        is_header: false,
+                        submenu_id: None,
+                    });
+                }
             }
             11 => {
-                // Backpack
+                // Backpack - scrollable!
+                let items = self.world.inventory.to_items();
+                let total = items.len();
+                let page_size = 12;
+                let offset = self
+                    .desktop_menu
+                    .as_ref()
+                    .map_or(0, |m| m.backpack_offset)
+                    .min(total.saturating_sub(1));
+                let end = (offset + page_size).min(total);
+
                 entries.push(MenuEntry {
                     id: 0,
                     label: "Backpack Inventory".to_owned(),
-                    subtext: None,
+                    subtext: if total > 0 {
+                        Some(format!("{}-{}/{}", offset + 1, end, total))
+                    } else {
+                        None
+                    },
                     checked: None,
                     disabled: false,
                     is_separator: false,
@@ -1283,7 +1429,6 @@ impl RuntimeState {
                     submenu_id: None,
                 });
 
-                let items = self.world.inventory.to_items();
                 if items.is_empty() {
                     entries.push(MenuEntry {
                         id: 0,
@@ -1296,11 +1441,39 @@ impl RuntimeState {
                         submenu_id: None,
                     });
                 } else {
-                    for (idx, it) in items.iter().enumerate() {
+                    if offset > 0 {
                         entries.push(MenuEntry {
-                            id: 3000 + idx as u32,
+                            id: 2998,
+                            label: "▲ Scroll Up".to_owned(),
+                            subtext: Some(format!("(-{})", offset.min(page_size))),
+                            checked: None,
+                            disabled: false,
+                            is_separator: false,
+                            is_header: false,
+                            submenu_id: None,
+                        });
+                    }
+
+                    for (idx, it) in items[offset..end].iter().enumerate() {
+                        let actual_idx = offset + idx;
+                        let count_str = format!("x{}", it.count);
+                        entries.push(MenuEntry {
+                            id: 3000 + actual_idx as u32,
                             label: it.id.clone(),
-                            subtext: Some(format!("x{}", it.count)),
+                            subtext: Some(count_str),
+                            checked: None,
+                            disabled: false,
+                            is_separator: false,
+                            is_header: false,
+                            submenu_id: None,
+                        });
+                    }
+
+                    if end < total {
+                        entries.push(MenuEntry {
+                            id: 2999,
+                            label: "▼ Scroll Down".to_owned(),
+                            subtext: Some(format!("(+{})", (total - end).min(page_size))),
                             checked: None,
                             disabled: false,
                             is_separator: false,
@@ -1409,28 +1582,32 @@ impl RuntimeState {
                 self.handle_tray_cmd(TrayCommand::Quit);
                 self.close_context_menu();
             }
+            998 => {
+                self.scroll_menu(-6);
+            }
+            999 => {
+                self.scroll_menu(6);
+            }
             1000..=1999 => {
-                let popular = [
-                    "Fruit Juice",
-                    "1L Pure Water",
-                    "Mineral Water",
-                    "Sandwich",
-                    "Bread",
-                    "Steak",
-                    "Cookie",
-                    "Cola",
-                    "Coffee",
-                    "Medicine",
-                ];
                 let idx = (action_id - 1000) as usize;
-                if let Some(&name) = popular.get(idx) {
-                    let _ = self.feed_by_name(name);
+                let mut all_foods = self.content.foods.all();
+                all_foods.sort_by(|a, b| {
+                    a.price
+                        .partial_cmp(&b.price)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
+                if let Some(f) = all_foods.get(idx) {
+                    let name = f.name.clone();
+                    if let Err(err) = self.feed_by_name(&name) {
+                        warn!(%err, "failed to feed item from context menu");
+                        self.anim.show_bubble(format!("Oops! ({err})"), 3_000);
+                    }
                     self.refresh_visuals();
                     self.shell.present();
                 }
                 self.close_context_menu();
             }
-            2000..=2999 => {
+            2000..=2997 => {
                 let idx = (action_id - 2000) as usize;
                 if let Some(w) = self.pet_cfg.works.get(idx) {
                     let name = w.name.clone();
@@ -1440,12 +1617,21 @@ impl RuntimeState {
                 }
                 self.close_context_menu();
             }
+            2998 => {
+                self.scroll_menu(-6);
+            }
+            2999 => {
+                self.scroll_menu(6);
+            }
             3000..=3999 => {
                 let idx = (action_id - 3000) as usize;
                 let items = self.world.inventory.to_items();
                 if let Some(it) = items.get(idx) {
                     let name = it.id.clone();
-                    let _ = self.feed_by_name(&name);
+                    if let Err(err) = self.feed_by_name(&name) {
+                        warn!(%err, "failed to feed item from backpack");
+                        self.anim.show_bubble(format!("Oops! ({err})"), 3_000);
+                    }
                     self.refresh_visuals();
                     self.shell.present();
                 }
@@ -1871,6 +2057,12 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
                             state.close_context_menu();
                         }
                     }
+                    SurfaceEvent::Axis { dy, .. } => {
+                        if state.desktop_menu.is_some() {
+                            let step = if dy > 0.0 { 3 } else { -3 };
+                            state.scroll_menu(step);
+                        }
+                    }
                     SurfaceEvent::DragStarted { .. } => {
                         state.close_context_menu();
                         state
@@ -1946,28 +2138,26 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
                 .and_then(|k| state.cache.get(&k))
                 .map(|clip| clip.frames.iter().map(|f| f.duration_ms).collect());
 
-            if !state.shell.is_dragging() {
-                let mut step_pos = if state.desktop_menu.is_some() {
-                    (pos.0, pos.1)
-                } else {
-                    pos
-                };
-                state.anim.advance(
-                    33,
-                    durs.as_deref(),
-                    &mut step_pos,
-                    AdvanceViewport {
-                        bounds,
-                        sprite_logical,
-                        output_name: &out_name,
-                    },
-                    &state.anim_index,
-                    &mut state.world,
-                );
-                if state.desktop_menu.is_none() {
-                    pos = step_pos;
-                    state.shell.set_position(pos.0, pos.1);
-                }
+            let mut step_pos = if state.desktop_menu.is_some() || state.shell.is_dragging() {
+                (pos.0, pos.1)
+            } else {
+                pos
+            };
+            state.anim.advance(
+                33,
+                durs.as_deref(),
+                &mut step_pos,
+                AdvanceViewport {
+                    bounds,
+                    sprite_logical,
+                    output_name: &out_name,
+                },
+                &state.anim_index,
+                &mut state.world,
+            );
+            if !state.shell.is_dragging() && state.desktop_menu.is_none() {
+                pos = step_pos;
+                state.shell.set_position(pos.0, pos.1);
             }
 
             state.refresh_visuals();
@@ -2095,6 +2285,15 @@ fn preload_essential_clips(
         (GraphType::SideHideRightRise, None, AnimatType::AStart),
         (GraphType::SideHideRightRise, None, AnimatType::BLoop),
         (GraphType::SideHideRightRise, None, AnimatType::CEnd),
+        (GraphType::Move, Some("climb.left"), AnimatType::BLoop),
+        (GraphType::Move, Some("climb.right"), AnimatType::BLoop),
+        (GraphType::Move, Some("climb.top.left"), AnimatType::BLoop),
+        (GraphType::Move, Some("climb.top.right"), AnimatType::BLoop),
+        (GraphType::Move, Some("fall.left"), AnimatType::BLoop),
+        (GraphType::Move, Some("fall.right"), AnimatType::BLoop),
+        (GraphType::Move, Some("crawl.left"), AnimatType::BLoop),
+        (GraphType::Move, Some("crawl.right"), AnimatType::BLoop),
+        (GraphType::Common, Some("bday"), AnimatType::BLoop),
     ];
     let items = specs.into_iter().filter_map(|(gt, name, animat)| {
         let entry = index.pick(gt, name, animat, mode, seed)?;

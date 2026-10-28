@@ -65,8 +65,16 @@ pub enum SwitchKind {
     Thirsty,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClimbKind {
+    LeftWall,
+    RightWall,
+    TopCeilingLeft,
+    TopCeilingRight,
+}
+
 /// High-level behavioral state ordered by priority:
-/// `Raised (100) > Shutdown (95) > StartUp (85) > LevelUp (80) > Pinch (75) > Touch (70) > Eating (65) > Switch (60) > Working (50) > Thinking (45) > Saying (40) > SideHide (35) > Moving (30) > StateOne (25) > IdleFidget (22) > Idle (20) > Sleeping (10)`.
+/// `Raised (100) > Shutdown (95) > StartUp (85) > LevelUp (80) > Pinch (75) > Touch (70) > Eating (65) > Switch (60) > Working (50) > Thinking (45) > Saying (40) > BDay (38) > Dancing (36) > SideHide/Climbing/Falling (35) > Moving (30) > StateOne (25) > IdleFidget (22) > Idle (20) > Sleeping (10)`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ActionState {
     StartUp,
@@ -85,6 +93,14 @@ pub enum ActionState {
         dir_x: i32,
         speed_px_per_sec: i32,
         loops_remaining: u32,
+        is_crawl: bool,
+    },
+    Climbing {
+        kind: ClimbKind,
+        loops_remaining: u32,
+    },
+    Falling {
+        left: bool,
     },
     SideHide {
         left: bool,
@@ -93,6 +109,7 @@ pub enum ActionState {
     Dancing {
         loops_remaining: u32,
     },
+    BDay,
     Saying,
     Thinking,
     Working {
@@ -126,7 +143,10 @@ impl ActionState {
             Self::StateOne => 25,
             Self::Moving { .. } => 30,
             Self::SideHide { .. } => 35,
+            Self::Climbing { .. } => 35,
+            Self::Falling { .. } => 35,
             Self::Dancing { .. } => 36,
+            Self::BDay => 38,
             Self::Saying => 40,
             Self::Thinking => 45,
             Self::Working { .. } => 50,
@@ -268,6 +288,23 @@ impl InteractionController {
         );
     }
 
+    pub fn on_climb(&mut self, kind: ClimbKind, index: &AnimationIndex, world: &mut World) {
+        self.request_state(
+            ActionState::Climbing {
+                kind,
+                loops_remaining: 8,
+            },
+            true,
+            index,
+            world,
+        );
+    }
+
+    pub fn on_bday(&mut self, index: &AnimationIndex, world: &mut World) {
+        self.show_bubble("Happy Birthday! ~", 5_000);
+        self.request_state(ActionState::BDay, true, index, world);
+    }
+
     pub fn on_switch(&mut self, kind: SwitchKind, index: &AnimationIndex, world: &mut World) {
         self.request_state(ActionState::Switch { kind }, false, index, world);
     }
@@ -348,7 +385,24 @@ impl InteractionController {
         let max_x = (bounds.0 as i32 - sprite_logical.0 as i32).max(0);
         let offset_left = ((219_f32 * sprite_logical.0 as f32) / 500.0).round() as i32;
         let offset_right = (((500.0 - 281_f32) * sprite_logical.0 as f32) / 500.0).round() as i32;
-        if pos.0 <= 60 {
+        if pos.1 <= 60 {
+            pos.1 = 0;
+            world.output_positions.insert(output_name.to_owned(), pos);
+            let kind = if pos.0 < max_x / 2 {
+                ClimbKind::TopCeilingRight
+            } else {
+                ClimbKind::TopCeilingLeft
+            };
+            self.request_state(
+                ActionState::Climbing {
+                    kind,
+                    loops_remaining: 6,
+                },
+                true,
+                index,
+                world,
+            );
+        } else if pos.0 <= 60 {
             pos.0 = -offset_left;
             world.output_positions.insert(output_name.to_owned(), pos);
             self.request_state(
@@ -504,11 +558,13 @@ impl InteractionController {
                     };
 
                     let loops_remaining = if towards_wall { 10 } else { 4 };
+                    let is_crawl = world.rng.next_u64() % 100 < 20;
                     self.request_state(
                         ActionState::Moving {
                             dir_x,
-                            speed_px_per_sec: 56,
+                            speed_px_per_sec: if is_crawl { 36 } else { 56 },
                             loops_remaining,
+                            is_crawl,
                         },
                         false,
                         index,
@@ -535,11 +591,120 @@ impl InteractionController {
             };
         }
 
+        if let ActionState::Climbing { kind, .. } = self.state {
+            let max_x = (bounds.0 as i32 - sprite_logical.0 as i32).max(0);
+            let offset_left = ((219_f32 * sprite_logical.0 as f32) / 500.0).round() as i32;
+            let offset_right =
+                (((500.0 - 281_f32) * sprite_logical.0 as f32) / 500.0).round() as i32;
+            match kind {
+                ClimbKind::LeftWall => {
+                    pos.0 = -offset_left;
+                    self.walk_subpx += 40.0 * (f64::from(dt_ms) / 1000.0);
+                    let step = self.walk_subpx.trunc() as i32;
+                    if step > 0 {
+                        self.walk_subpx -= f64::from(step);
+                        pos.1 = pos.1.saturating_sub(step);
+                        world.statistics.pixels_walked += u64::from(step as u32);
+                        world.output_positions.insert(output_name.to_owned(), *pos);
+                        if pos.1 <= 15 {
+                            pos.1 = 0;
+                            self.request_state(
+                                ActionState::Climbing {
+                                    kind: ClimbKind::TopCeilingRight,
+                                    loops_remaining: 6,
+                                },
+                                true,
+                                index,
+                                world,
+                            );
+                            return;
+                        }
+                    }
+                }
+                ClimbKind::RightWall => {
+                    pos.0 = max_x + offset_right;
+                    self.walk_subpx += 40.0 * (f64::from(dt_ms) / 1000.0);
+                    let step = self.walk_subpx.trunc() as i32;
+                    if step > 0 {
+                        self.walk_subpx -= f64::from(step);
+                        pos.1 = pos.1.saturating_sub(step);
+                        world.statistics.pixels_walked += u64::from(step as u32);
+                        world.output_positions.insert(output_name.to_owned(), *pos);
+                        if pos.1 <= 15 {
+                            pos.1 = 0;
+                            self.request_state(
+                                ActionState::Climbing {
+                                    kind: ClimbKind::TopCeilingLeft,
+                                    loops_remaining: 6,
+                                },
+                                true,
+                                index,
+                                world,
+                            );
+                            return;
+                        }
+                    }
+                }
+                ClimbKind::TopCeilingRight => {
+                    pos.1 = 0;
+                    self.walk_subpx += 45.0 * (f64::from(dt_ms) / 1000.0);
+                    let step = self.walk_subpx.trunc() as i32;
+                    if step > 0 {
+                        self.walk_subpx -= f64::from(step);
+                        pos.0 = (pos.0 + step).min(max_x);
+                        world.statistics.pixels_walked += u64::from(step as u32);
+                        world.output_positions.insert(output_name.to_owned(), *pos);
+                        if pos.0 >= max_x / 2 {
+                            self.request_state(
+                                ActionState::Falling { left: false },
+                                true,
+                                index,
+                                world,
+                            );
+                            return;
+                        }
+                    }
+                }
+                ClimbKind::TopCeilingLeft => {
+                    pos.1 = 0;
+                    self.walk_subpx += 45.0 * (f64::from(dt_ms) / 1000.0);
+                    let step = self.walk_subpx.trunc() as i32;
+                    if step > 0 {
+                        self.walk_subpx -= f64::from(step);
+                        pos.0 = (pos.0 - step).max(0);
+                        world.statistics.pixels_walked += u64::from(step as u32);
+                        world.output_positions.insert(output_name.to_owned(), *pos);
+                        if pos.0 <= max_x / 2 {
+                            self.request_state(
+                                ActionState::Falling { left: true },
+                                true,
+                                index,
+                                world,
+                            );
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
+        if let ActionState::Falling { .. } = self.state {
+            let floor_y = (bounds.1 as i32 - sprite_logical.1 as i32).max(0);
+            self.walk_subpx += 280.0 * (f64::from(dt_ms) / 1000.0);
+            let step = self.walk_subpx.trunc() as i32;
+            if step > 0 {
+                self.walk_subpx -= f64::from(step);
+                pos.1 = (pos.1 + step).min(floor_y);
+                world.output_positions.insert(output_name.to_owned(), *pos);
+            }
+        }
+
         // Apply horizontal movement during `Moving` and bounce/climb cleanly at screen edges.
         if let ActionState::Moving {
             dir_x,
             speed_px_per_sec,
             loops_remaining: _,
+            is_crawl: _,
         } = self.state
         {
             let max_x = (bounds.0 as i32 - sprite_logical.0 as i32).max(0);
@@ -561,29 +726,53 @@ impl InteractionController {
                 if next_x <= 25 && dir_x < 0 {
                     let offset_left = ((219_f32 * sprite_logical.0 as f32) / 500.0).round() as i32;
                     pos.0 = -offset_left;
-                    self.request_state(
-                        ActionState::SideHide {
-                            left: true,
-                            emerging: false,
-                        },
-                        true,
-                        index,
-                        world,
-                    );
+                    if world.rng.next_u64() & 1 == 0 {
+                        self.request_state(
+                            ActionState::Climbing {
+                                kind: ClimbKind::LeftWall,
+                                loops_remaining: 8,
+                            },
+                            true,
+                            index,
+                            world,
+                        );
+                    } else {
+                        self.request_state(
+                            ActionState::SideHide {
+                                left: true,
+                                emerging: false,
+                            },
+                            true,
+                            index,
+                            world,
+                        );
+                    }
                     return;
                 } else if next_x >= max_x.saturating_sub(25) && dir_x > 0 {
                     let offset_right =
                         (((500.0 - 281_f32) * sprite_logical.0 as f32) / 500.0).round() as i32;
                     pos.0 = max_x + offset_right;
-                    self.request_state(
-                        ActionState::SideHide {
-                            left: false,
-                            emerging: false,
-                        },
-                        true,
-                        index,
-                        world,
-                    );
+                    if world.rng.next_u64() & 1 == 0 {
+                        self.request_state(
+                            ActionState::Climbing {
+                                kind: ClimbKind::RightWall,
+                                loops_remaining: 8,
+                            },
+                            true,
+                            index,
+                            world,
+                        );
+                    } else {
+                        self.request_state(
+                            ActionState::SideHide {
+                                left: false,
+                                emerging: false,
+                            },
+                            true,
+                            index,
+                            world,
+                        );
+                    }
                     return;
                 }
             }
@@ -692,12 +881,14 @@ impl InteractionController {
             ActionState::Moving {
                 dir_x,
                 loops_remaining,
+                is_crawl,
                 ..
             } => {
-                let walk_name = if *dir_x < 0 {
-                    "walk.left"
-                } else {
-                    "walk.right"
+                let walk_name = match (*is_crawl, *dir_x < 0) {
+                    (true, true) => "crawl.left",
+                    (true, false) => "crawl.right",
+                    (false, true) => "walk.left",
+                    (false, false) => "walk.right",
                 };
                 resolve_chain_start(
                     index,
@@ -709,6 +900,47 @@ impl InteractionController {
                     false,
                 )
             }
+            ActionState::Climbing {
+                kind,
+                loops_remaining,
+            } => {
+                let climb_name = match kind {
+                    ClimbKind::LeftWall => "climb.left",
+                    ClimbKind::RightWall => "climb.right",
+                    ClimbKind::TopCeilingLeft => "climb.top.left",
+                    ClimbKind::TopCeilingRight => "climb.top.right",
+                };
+                resolve_chain_start(
+                    index,
+                    GraphType::Move,
+                    Some(climb_name),
+                    mode,
+                    seed,
+                    Some(*loops_remaining),
+                    false,
+                )
+            }
+            ActionState::Falling { left } => {
+                let fall_name = if *left { "fall.left" } else { "fall.right" };
+                resolve_chain_start(
+                    index,
+                    GraphType::Move,
+                    Some(fall_name),
+                    mode,
+                    seed,
+                    None,
+                    false,
+                )
+            }
+            ActionState::BDay => resolve_chain_start(
+                index,
+                GraphType::Common,
+                Some("bday"),
+                mode,
+                seed,
+                Some(2),
+                false,
+            ),
             ActionState::Saying => {
                 resolve_chain_start(index, GraphType::Say, None, mode, seed, Some(1), false)
             }
@@ -861,6 +1093,9 @@ impl InteractionController {
                     | ActionState::Saying
                     | ActionState::Thinking
                     | ActionState::Dancing { .. }
+                    | ActionState::Climbing { .. }
+                    | ActionState::Falling { .. }
+                    | ActionState::BDay
             )
         {
             self.finish_transient_state(index, world);
@@ -873,10 +1108,14 @@ impl InteractionController {
         };
 
         let loop_budget = match &self.state {
-            ActionState::Touch { .. } | ActionState::Saying | ActionState::SideHide { .. } => {
-                Some(1)
-            }
-            ActionState::Dancing { loops_remaining } => Some(*loops_remaining),
+            ActionState::Touch { .. }
+            | ActionState::Saying
+            | ActionState::SideHide { .. }
+            | ActionState::BDay => Some(1),
+            ActionState::Dancing { loops_remaining }
+            | ActionState::Climbing {
+                loops_remaining, ..
+            } => Some(*loops_remaining),
             ActionState::Moving {
                 loops_remaining, ..
             } => Some(*loops_remaining),
@@ -976,10 +1215,29 @@ impl InteractionController {
                     dir_x,
                     speed_px_per_sec: 48,
                     loops_remaining: 3,
+                    is_crawl: false,
                 };
                 self.active_clip = None;
                 self.enter_state_clip(index, world);
                 return;
+            }
+            ActionState::Climbing { kind, .. } => match kind {
+                ClimbKind::TopCeilingLeft => {
+                    self.state = ActionState::Falling { left: true };
+                    self.active_clip = None;
+                    self.enter_state_clip(index, world);
+                    return;
+                }
+                ClimbKind::TopCeilingRight => {
+                    self.state = ActionState::Falling { left: false };
+                    self.active_clip = None;
+                    self.enter_state_clip(index, world);
+                    return;
+                }
+                _ => {}
+            },
+            ActionState::Falling { .. } => {
+                // Done landing, fallend played, return to idle!
             }
             _ => {}
         }
@@ -1118,6 +1376,7 @@ mod tests {
                 dir_x: -1,
                 speed_px_per_sec: 100,
                 loops_remaining: 2,
+                is_crawl: false,
             },
             false,
             &idx,
@@ -1176,6 +1435,7 @@ mod tests {
                 dir_x: -1,
                 speed_px_per_sec: 100,
                 loops_remaining: 2,
+                is_crawl: false,
             },
             true,
             &idx,
@@ -1197,6 +1457,10 @@ mod tests {
         assert!(matches!(
             ctrl.state(),
             ActionState::SideHide { left: true, .. }
+                | ActionState::Climbing {
+                    kind: ClimbKind::LeftWall,
+                    ..
+                }
         ));
 
         // Test pinch face triggers Pinch animation state
@@ -1207,8 +1471,21 @@ mod tests {
         ctrl.on_feed("eat", Some("Apple".to_owned()), None, &idx, &mut world);
         assert!(matches!(ctrl.state(), ActionState::Eating { .. }));
 
-        // Test level up animation
+        // Test level up queued during eating finishes into LevelUp
         ctrl.on_level_up(&idx, &mut world);
+        assert!(matches!(ctrl.state(), ActionState::Eating { .. }));
+        ctrl.advance(
+            3000,
+            Some(&[500, 500]),
+            &mut pos,
+            AdvanceViewport {
+                bounds: (1920, 1080),
+                sprite_logical: (250, 250),
+                output_name: "eDP-1",
+            },
+            &idx,
+            &mut world,
+        );
         assert_eq!(ctrl.state(), &ActionState::LevelUp);
 
         // Test dance animation

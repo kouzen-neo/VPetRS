@@ -972,7 +972,20 @@ impl PointerHandler for WaylandShell {
                         self.pending_events.push(ev);
                     }
                 }
-                PointerEventKind::Axis { .. } => {}
+                PointerEventKind::Axis { vertical, .. } => {
+                    let dy = if vertical.discrete != 0 {
+                        vertical.discrete as f64
+                    } else {
+                        vertical.absolute
+                    };
+                    if dy.abs() > 0.001 {
+                        self.pending_events.push(SurfaceEvent::Axis {
+                            x: event.position.0,
+                            y: event.position.1,
+                            dy,
+                        });
+                    }
+                }
             }
         }
 

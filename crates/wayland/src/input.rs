@@ -14,6 +14,7 @@ pub enum SurfaceEvent {
     DragStarted { pet_x: i32, pet_y: i32 },
     Dragged { pet_x: i32, pet_y: i32 },
     DragEnded { pet_x: i32, pet_y: i32 },
+    Axis { x: f64, y: f64, dy: f64 },
 }
 
 #[derive(Debug, Default)]

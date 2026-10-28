@@ -1182,13 +1182,33 @@ mod tests {
         );
         assert!(
             !idx.query(
-                GraphType::Common,
-                Some("music"),
+                GraphType::Move,
+                Some("climb.left"),
                 AnimatType::BLoop,
-                ModeType::Nomal
+                ModeType::Happy
             )
             .is_empty(),
-            "music BLoop must be queryable in Nomal mode"
+            "climb.left BLoop must be queryable in Happy mode"
+        );
+        assert!(
+            !idx.query(
+                GraphType::Move,
+                Some("climb.top.left"),
+                AnimatType::BLoop,
+                ModeType::Happy
+            )
+            .is_empty(),
+            "climb.top.left BLoop must be queryable in Happy mode"
+        );
+        assert!(
+            !idx.query(
+                GraphType::Move,
+                Some("fall.left"),
+                AnimatType::BLoop,
+                ModeType::Happy
+            )
+            .is_empty(),
+            "fall.left BLoop must be queryable in Happy mode"
         );
     }
 }
