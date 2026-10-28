@@ -130,6 +130,7 @@ pub enum ActionState {
     },
     Raised {
         dropping: bool,
+        is_static: bool,
     },
 }
 
@@ -213,6 +214,7 @@ pub struct InteractionController {
     prev_food: f64,
     prev_drink: f64,
     pending_level_up: bool,
+    drag_still_elapsed_ms: u32,
 }
 
 impl InteractionController {
@@ -232,6 +234,7 @@ impl InteractionController {
             prev_food: 100.0,
             prev_drink: 100.0,
             pending_level_up: false,
+            drag_still_elapsed_ms: 0,
         }
     }
 
@@ -370,7 +373,29 @@ impl InteractionController {
     }
 
     pub fn on_drag_start(&mut self, index: &AnimationIndex, world: &mut World) {
-        self.request_state(ActionState::Raised { dropping: false }, true, index, world);
+        self.drag_still_elapsed_ms = 0;
+        self.request_state(
+            ActionState::Raised {
+                dropping: false,
+                is_static: false,
+            },
+            true,
+            index,
+            world,
+        );
+    }
+
+    pub fn on_drag_motion(&mut self, index: &AnimationIndex, world: &mut World) {
+        self.drag_still_elapsed_ms = 0;
+        if let ActionState::Raised {
+            dropping: false,
+            is_static,
+        } = &mut self.state
+            && *is_static
+        {
+            *is_static = false;
+            self.enter_state_clip(index, world);
+        }
     }
 
     pub fn on_drag_end(
@@ -429,7 +454,15 @@ impl InteractionController {
             );
         } else {
             world.output_positions.insert(output_name.to_owned(), pos);
-            self.request_state(ActionState::Raised { dropping: true }, true, index, world);
+            self.request_state(
+                ActionState::Raised {
+                    dropping: true,
+                    is_static: false,
+                },
+                true,
+                index,
+                world,
+            );
         }
     }
 
@@ -579,6 +612,20 @@ impl InteractionController {
             }
         }
 
+        // If pet is being held in the air, check if she has been held still
+        if let ActionState::Raised {
+            dropping: false,
+            is_static,
+        } = &mut self.state
+        {
+            self.drag_still_elapsed_ms = self.drag_still_elapsed_ms.saturating_add(dt_ms);
+            // If held still for more than 1.4 seconds, transition to relaxed static blinking!
+            if !*is_static && self.drag_still_elapsed_ms >= 1400 {
+                *is_static = true;
+                self.enter_state_clip(index, world);
+            }
+        }
+
         // Hold edge position during SideHide so character aligns exactly with screen bezel.
         if let ActionState::SideHide { left, .. } = self.state {
             let max_x = (bounds.0 as i32 - sprite_logical.0 as i32).max(0);
@@ -601,7 +648,7 @@ impl InteractionController {
             match kind {
                 ClimbKind::LeftWall => {
                     pos.0 = -offset_left;
-                    self.walk_subpx += 40.0 * (f64::from(dt_ms) / 1000.0);
+                    self.walk_subpx += 95.0 * (f64::from(dt_ms) / 1000.0);
                     let step = self.walk_subpx.trunc() as i32;
                     if step > 0 {
                         self.walk_subpx -= f64::from(step);
@@ -625,7 +672,7 @@ impl InteractionController {
                 }
                 ClimbKind::RightWall => {
                     pos.0 = max_x + offset_right;
-                    self.walk_subpx += 40.0 * (f64::from(dt_ms) / 1000.0);
+                    self.walk_subpx += 95.0 * (f64::from(dt_ms) / 1000.0);
                     let step = self.walk_subpx.trunc() as i32;
                     if step > 0 {
                         self.walk_subpx -= f64::from(step);
@@ -649,7 +696,7 @@ impl InteractionController {
                 }
                 ClimbKind::TopCeilingRight => {
                     pos.1 = -offset_top;
-                    self.walk_subpx += 45.0 * (f64::from(dt_ms) / 1000.0);
+                    self.walk_subpx += 65.0 * (f64::from(dt_ms) / 1000.0);
                     let step = self.walk_subpx.trunc() as i32;
                     if step > 0 {
                         self.walk_subpx -= f64::from(step);
@@ -669,7 +716,7 @@ impl InteractionController {
                 }
                 ClimbKind::TopCeilingLeft => {
                     pos.1 = -offset_top;
-                    self.walk_subpx += 45.0 * (f64::from(dt_ms) / 1000.0);
+                    self.walk_subpx += 65.0 * (f64::from(dt_ms) / 1000.0);
                     let step = self.walk_subpx.trunc() as i32;
                     if step > 0 {
                         self.walk_subpx -= f64::from(step);
@@ -692,12 +739,16 @@ impl InteractionController {
 
         if let ActionState::Falling { .. } = self.state {
             let floor_y = (bounds.1 as i32 - sprite_logical.1 as i32).max(0);
-            self.walk_subpx += 280.0 * (f64::from(dt_ms) / 1000.0);
+            self.walk_subpx += 380.0 * (f64::from(dt_ms) / 1000.0);
             let step = self.walk_subpx.trunc() as i32;
             if step > 0 {
                 self.walk_subpx -= f64::from(step);
                 pos.1 = (pos.1 + step).min(floor_y);
                 world.output_positions.insert(output_name.to_owned(), *pos);
+                if pos.1 >= floor_y {
+                    self.finish_transient_state(index, world);
+                    return;
+                }
             }
         }
 
@@ -1052,7 +1103,10 @@ impl InteractionController {
                 };
                 resolve_chain_start(index, gt, None, mode, seed, Some(1), false)
             }
-            ActionState::Raised { dropping: false } => resolve_chain_start(
+            ActionState::Raised {
+                dropping: false,
+                is_static: false,
+            } => resolve_chain_start(
                 index,
                 GraphType::RaisedDynamic,
                 None,
@@ -1061,7 +1115,11 @@ impl InteractionController {
                 None,
                 true,
             ),
-            ActionState::Raised { dropping: true } => {
+            ActionState::Raised {
+                dropping: false,
+                is_static: true,
+            } => resolve_chain_start(index, GraphType::RaisedStatic, None, mode, seed, None, true),
+            ActionState::Raised { dropping: true, .. } => {
                 resolve_c_end_or_single(index, GraphType::RaisedStatic, None, mode, seed)
             }
         };
@@ -1082,7 +1140,7 @@ impl InteractionController {
         if self.active_clip.is_none()
             && matches!(
                 self.state,
-                ActionState::Raised { dropping: true }
+                ActionState::Raised { dropping: true, .. }
                     | ActionState::Sleeping { waking: true }
                     | ActionState::Touch { .. }
                     | ActionState::Pinch
@@ -1165,6 +1223,24 @@ impl InteractionController {
                 self.finish_transient_state(index, world);
             }
             SegmentPhase::BLoop { .. } => {
+                if matches!(
+                    self.state,
+                    ActionState::Climbing {
+                        kind: ClimbKind::LeftWall | ClimbKind::RightWall,
+                        ..
+                    }
+                ) {
+                    return;
+                }
+                if matches!(
+                    self.state,
+                    ActionState::Raised {
+                        dropping: false,
+                        is_static: true
+                    }
+                ) {
+                    return;
+                }
                 if let Some(c_entry) = index.pick(
                     prev.graph_type,
                     prev.name.as_deref(),
@@ -1184,14 +1260,53 @@ impl InteractionController {
                 }
                 self.finish_transient_state(index, world);
             }
-            SegmentPhase::CEnd | SegmentPhase::Single { .. } => {
+            SegmentPhase::CEnd => {
                 self.finish_transient_state(index, world);
+            }
+            SegmentPhase::Single { looped } => {
+                if let ActionState::Raised {
+                    dropping: false,
+                    is_static: false,
+                } = self.state
+                {
+                    let seed = world.rng.next_u64();
+                    if let Some((entry, phase, name_opt)) = resolve_chain_start(
+                        index,
+                        GraphType::RaisedDynamic,
+                        None,
+                        world.pet.mode,
+                        seed,
+                        None,
+                        true,
+                    ) {
+                        self.active_clip = Some(ActiveClip {
+                            cache_key: clip_cache_key(entry, self.target_px),
+                            graph_type: entry.graph_type,
+                            name: name_opt,
+                            mode: world.pet.mode,
+                            phase,
+                            source: entry.source.clone(),
+                            frame_index: 0,
+                            frame_elapsed_ms: 0,
+                            seed,
+                        });
+                        return;
+                    }
+                }
+                if !looped {
+                    self.finish_transient_state(index, world);
+                }
             }
         }
     }
 
     fn finish_transient_state(&mut self, index: &AnimationIndex, world: &mut World) {
         match self.state {
+            ActionState::Raised {
+                dropping: false, ..
+            } => {
+                return;
+            }
             ActionState::Shutdown { .. } => {
                 self.shutdown_ready = true;
                 return;
@@ -1404,7 +1519,13 @@ mod tests {
 
         // Higher-priority Drag/Raised preempts anything and saves output position on drop.
         ctrl.on_drag_start(&idx, &mut world);
-        assert_eq!(ctrl.state(), &ActionState::Raised { dropping: false });
+        assert_eq!(
+            ctrl.state(),
+            &ActionState::Raised {
+                dropping: false,
+                is_static: false
+            }
+        );
         ctrl.on_drag_end(
             "eDP-1",
             (320, 640),

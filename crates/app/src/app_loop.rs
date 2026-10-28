@@ -2070,6 +2070,11 @@ pub fn run_daemon(paths: AppPaths, mut config: AppConfig, overrides: RunOverride
                             .anim
                             .on_drag_start(&state.anim_index, &mut state.world);
                     }
+                    SurfaceEvent::Dragged { .. } => {
+                        state
+                            .anim
+                            .on_drag_motion(&state.anim_index, &mut state.world);
+                    }
                     SurfaceEvent::DragEnded { pet_x, pet_y } => {
                         let out_name = state.shell.active_output_name().to_owned();
                         let bounds = state.shell.output_logical_size();

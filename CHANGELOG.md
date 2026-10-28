@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- **Relaxed Static Pose While Held (`vpet-app`)**:
+  - After holding the pet still for 1.4 seconds, she now switches from the paddling `Raised_Dynamic` loop to the relaxed blinking `Raised_Static` pose, and resumes paddling as soon as she is moved again.
+
+### Fixed
+
+- **Ceiling Fall Landing and Climb Loop Completion (`vpet-app`)**:
+  - Falling now ends cleanly when the pet reaches the floor and returns to idle instead of looping at the bottom of the screen.
+  - Wall and ceiling climbing loops no longer terminate while the pet is still mid-air; the climb animation keeps repeating until she reaches the top or corner.
+  - Wired drag motion events into the animation controller so hold-still detection resets whenever the cursor moves, and repaired the transitions left incomplete by the previous edit.
+
 ## [v1.7.0] - 2026-10-28
 
 ### Added
