@@ -33,12 +33,14 @@ VPetRS renders on `zwlr_layer_surface_v1` instead, which fixes all four:
 
 - **Native layer-shell rendering:** `smithay-client-toolkit` + `calloop`, `tiny-skia` CPU compositing into `wl_shm`, damage tracking, frame-callback throttling, and fractional scaling (`wp_fractional_scale_v1` + `wp_viewporter`).
 - **VPet content compatibility:** LinePutScript parser and a `PetLoader` / `GraphInfo`-compatible animation indexer. Supports `A_Start -> B_Loop -> C_End` chains, `Single`, `FoodAnimation`, APNG, and GIF. Content is localized to English through `lang/en/*.lps`.
-- **Interactions:** head/body touch hit zones from `vup.lps`, drag-to-raise, sleep/wake, auto-walk with screen-edge bounce, and speech bubbles shaped with `cosmic-text`.
-- **Simulation:** a deterministic 10 Hz core that follows the `GameSave_VPet` formulas (stat caps, leveling, digestion, condition modes), plus feeding, inventory, and timed buffs.
+- **Interactions:** head/body touch hit zones from `vup.lps`, drag-to-raise with a relaxed dangling pose after holding still, sleep/wake, and speech bubbles shaped with `cosmic-text`.
+- **Movement & physics:** auto-walk with screen-edge bounce, side-hide behind the left/right bezel, wall climbing (`climb.left` / `climb.right`), ceiling crawling (`climb.top.*`), falling with gravity landing, floor crawling, and music-triggered dancing via MPRIS (`playerctl`).
+- **Desktop context menu:** right-clicking the pet opens an Everforest-styled in-surface menu matching Waybar, with cascading submenus for the full scrollable `Food Store` (all 151 foods), the `Backpack`, work/study/play tasks, toggles, and AI chat.
+- **Simulation:** a deterministic 10 Hz core that follows the `GameSave_VPet` formulas (stat caps, leveling, digestion, condition modes), plus feeding, backpack inventory, and timed buffs.
 - **AI Chat (LLM):** background AI worker compatible with OpenAI, Ollama, LM Studio, and DeepSeek endpoints (defaults to `http://localhost:20128/v1` with model `9routerall`), supporting both standard JSON and streaming SSE chunks with speech bubble replies.
 - **Crash-safe saves:** MessagePack save files written atomically (`fsync` + rename) with 5 rotating backups and automatic recovery from a corrupt save.
 - **Desktop integration:** StatusNotifierItem tray icon (shows in `waybar`), live TOML config reload, and a Unix-socket IPC CLI (`vpet-rs ctl`, socket mode `0600`, `SO_PEERCRED` check).
-- **Lightweight:** an 8.2 MiB stripped native ELF that links only `libwayland-client`, `libc`, `libm`, and `libffi`. Measured at about **0.7% of one CPU core** and **about 60 MiB RSS** on a 1920x1080 niri output.
+- **Lightweight:** a ~10.3 MiB native ELF that links only `libwayland-client`, `libc`, `libm`, `libffi`, and `libgcc_s`. Measured at about **1% of one CPU core** and **~180 MiB RSS** on a 1920x1080 niri output once every animation and food-icon cache is warm.
 
 ---
 
@@ -109,6 +111,13 @@ vpet-rs ctl toggle-selfcare             # toggle auto-feeding when hungry/thirst
 vpet-rs ctl toggle-autowork             # toggle automatic work when well-fed
 vpet-rs ctl layer overlay               # switch between `top` and `overlay`
 vpet-rs ctl feed "Fruit Juice"          # feed an item from the food database
+vpet-rs ctl foods [category]            # list all 151 foods (optionally by category)
+vpet-rs ctl buy "Hamburger" 3           # buy items into the backpack
+vpet-rs ctl bag                         # list backpack contents (alias: inventory)
+vpet-rs ctl dance [loops]               # dance to music (alias: music)
+vpet-rs ctl side-hide [--left|--right]  # hide behind the nearest screen edge
+vpet-rs ctl climb [left|right|top|auto] # climb a wall or the ceiling
+vpet-rs ctl bday                        # play the Happy Birthday animation
 vpet-rs ctl chat "Hello Loris! How are you?" # chat with pet via AI LLM
 vpet-rs ctl prompt-chat                 # open desktop prompt dialog to chat
 vpet-rs ctl works                       # list all work/study/play tasks

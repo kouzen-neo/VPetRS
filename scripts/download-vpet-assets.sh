@@ -16,20 +16,24 @@ for candidate in \
     if [[ -d "$candidate" && -f "$candidate/info.lps" ]]; then
         echo "Found existing VPet installation on Steam: $candidate"
         mkdir -p "$(dirname "$DEST")"
-        ln -sf "$candidate" "$DEST"
+        ln -sfn "$candidate" "$DEST"
         echo "Linked to: $DEST"
         exit 0
     fi
 done
 
-# 2. Check local dev directory if present
-if [[ -d "/home/kouzen/Documents/VPet/VPet-Simulator.Windows/mod/0000_core" ]]; then
-    candidate="/home/kouzen/Documents/VPet/VPet-Simulator.Windows/mod/0000_core"
-    mkdir -p "$(dirname "$DEST")"
-    ln -sf "$candidate" "$DEST"
-    echo "Linked local dev assets to: $DEST"
-    exit 0
-fi
+# 2. Check a local clone (VPET_CORE_SRC or common development locations)
+for candidate in \
+    "${VPET_CORE_SRC:-}" \
+    "$HOME/Documents/VPet/VPet-Simulator.Windows/mod/0000_core" \
+    "$HOME/VPet/VPet-Simulator.Windows/mod/0000_core"; do
+    if [[ -n "$candidate" && -d "$candidate" && -f "$candidate/info.lps" ]]; then
+        mkdir -p "$(dirname "$DEST")"
+        ln -sfn "$candidate" "$DEST"
+        echo "Linked local assets to: $DEST"
+        exit 0
+    fi
+done
 
 # 3. Download via git sparse-checkout (only 0000_core, not the whole repository)
 echo "Downloading VPet 0000_core assets via git sparse-checkout..."
