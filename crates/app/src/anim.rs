@@ -192,6 +192,7 @@ pub struct InteractionController {
     prev_mode: ModeType,
     prev_food: f64,
     prev_drink: f64,
+    pending_level_up: bool,
 }
 
 impl InteractionController {
@@ -210,6 +211,7 @@ impl InteractionController {
             prev_mode: ModeType::Nomal,
             prev_food: 100.0,
             prev_drink: 100.0,
+            pending_level_up: false,
         }
     }
 
@@ -243,6 +245,10 @@ impl InteractionController {
     }
 
     pub fn on_level_up(&mut self, index: &AnimationIndex, world: &mut World) {
+        if matches!(self.state, ActionState::Eating { .. }) {
+            self.pending_level_up = true;
+            return;
+        }
         self.show_bubble("Level UP! ~", 4_000);
         self.request_state(ActionState::LevelUp, true, index, world);
     }
@@ -976,6 +982,15 @@ impl InteractionController {
                 return;
             }
             _ => {}
+        }
+
+        if self.pending_level_up {
+            self.pending_level_up = false;
+            self.show_bubble("Level UP! ~", 4_000);
+            self.state = ActionState::LevelUp;
+            self.active_clip = None;
+            self.enter_state_clip(index, world);
+            return;
         }
 
         self.state = if world.pet.sleeping {

@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- **Level Up Queueing & Food Alias Resolution (`vpet-app`)**:
+  - Prevented immediate `LevelUp` transitions from prematurely aborting active `Eating` animations when consuming high-EXP foods (such as Sirloin/steak); queued level up to play gracefully after eating finishes.
+  - Added food aliases for common names (`steak` -> `Sirloin`, `burger` -> `Hamburger`, `coke` -> `Cola`, `pasta` -> `Tomato Pasta`, `fish` -> `Steamed Sea Bass`).
+  - Added visual error feedback bubble when feeding fails from the tray menu instead of silently ignoring errors.
+
 ### Added
 
 - **Everforest Desktop Context Menu with Hover Cascades (`vpet-render`, `vpet-app`)**:

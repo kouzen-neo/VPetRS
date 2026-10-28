@@ -307,7 +307,25 @@ impl RuntimeState {
                 ),
                 None => (default_snack_effect(), default_snack_icon, "eat".to_owned()),
             }
-        } else if let Some(item) = self.content.foods.get(query) {
+        } else if let Some(item) = self.content.foods.get(query).or_else(|| {
+            let lower = query.to_ascii_lowercase();
+            if lower.contains("steak") {
+                self.content
+                    .foods
+                    .get("Sirloin")
+                    .or_else(|| self.content.foods.get("Fried Sirloin"))
+            } else if lower.contains("burger") {
+                self.content.foods.get("Hamburger")
+            } else if lower.contains("coke") {
+                self.content.foods.get("Cola")
+            } else if lower.contains("pasta") || lower.contains("noodle") {
+                self.content.foods.get("Tomato Pasta")
+            } else if lower.contains("fish") {
+                self.content.foods.get("Steamed Sea Bass")
+            } else {
+                None
+            }
+        }) {
             let fallback_icon = if item.graph == "drink" {
                 self.content
                     .foods
@@ -780,7 +798,10 @@ impl RuntimeState {
                 self.shell.present();
             }
             TrayCommand::FeedItem(name) => {
-                let _ = self.feed_by_name(&name);
+                if let Err(err) = self.feed_by_name(&name) {
+                    warn!(%err, "failed to feed item from tray");
+                    self.anim.show_bubble(format!("Oops! ({err})"), 3_000);
+                }
                 self.refresh_visuals();
                 self.shell.present();
             }
