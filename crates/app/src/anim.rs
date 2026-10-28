@@ -385,8 +385,9 @@ impl InteractionController {
         let max_x = (bounds.0 as i32 - sprite_logical.0 as i32).max(0);
         let offset_left = ((219_f32 * sprite_logical.0 as f32) / 500.0).round() as i32;
         let offset_right = (((500.0 - 281_f32) * sprite_logical.0 as f32) / 500.0).round() as i32;
+        let offset_top = ((150_f32 * sprite_logical.1 as f32) / 500.0).round() as i32;
         if pos.1 <= 60 {
-            pos.1 = 0;
+            pos.1 = -offset_top;
             world.output_positions.insert(output_name.to_owned(), pos);
             let kind = if pos.0 < max_x / 2 {
                 ClimbKind::TopCeilingRight
@@ -596,6 +597,7 @@ impl InteractionController {
             let offset_left = ((219_f32 * sprite_logical.0 as f32) / 500.0).round() as i32;
             let offset_right =
                 (((500.0 - 281_f32) * sprite_logical.0 as f32) / 500.0).round() as i32;
+            let offset_top = ((150_f32 * sprite_logical.1 as f32) / 500.0).round() as i32;
             match kind {
                 ClimbKind::LeftWall => {
                     pos.0 = -offset_left;
@@ -606,8 +608,8 @@ impl InteractionController {
                         pos.1 = pos.1.saturating_sub(step);
                         world.statistics.pixels_walked += u64::from(step as u32);
                         world.output_positions.insert(output_name.to_owned(), *pos);
-                        if pos.1 <= 15 {
-                            pos.1 = 0;
+                        if pos.1 <= -offset_top {
+                            pos.1 = -offset_top;
                             self.request_state(
                                 ActionState::Climbing {
                                     kind: ClimbKind::TopCeilingRight,
@@ -630,8 +632,8 @@ impl InteractionController {
                         pos.1 = pos.1.saturating_sub(step);
                         world.statistics.pixels_walked += u64::from(step as u32);
                         world.output_positions.insert(output_name.to_owned(), *pos);
-                        if pos.1 <= 15 {
-                            pos.1 = 0;
+                        if pos.1 <= -offset_top {
+                            pos.1 = -offset_top;
                             self.request_state(
                                 ActionState::Climbing {
                                     kind: ClimbKind::TopCeilingLeft,
@@ -646,7 +648,7 @@ impl InteractionController {
                     }
                 }
                 ClimbKind::TopCeilingRight => {
-                    pos.1 = 0;
+                    pos.1 = -offset_top;
                     self.walk_subpx += 45.0 * (f64::from(dt_ms) / 1000.0);
                     let step = self.walk_subpx.trunc() as i32;
                     if step > 0 {
@@ -666,7 +668,7 @@ impl InteractionController {
                     }
                 }
                 ClimbKind::TopCeilingLeft => {
-                    pos.1 = 0;
+                    pos.1 = -offset_top;
                     self.walk_subpx += 45.0 * (f64::from(dt_ms) / 1000.0);
                     let step = self.walk_subpx.trunc() as i32;
                     if step > 0 {

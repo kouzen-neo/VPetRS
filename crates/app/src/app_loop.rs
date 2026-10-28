@@ -751,6 +751,7 @@ impl RuntimeState {
                 let offset_left = ((219_f32 * sprite_logical.0 as f32) / 500.0).round() as i32;
                 let offset_right =
                     (((500.0 - 281_f32) * sprite_logical.0 as f32) / 500.0).round() as i32;
+                let offset_top = ((150_f32 * sprite_logical.1 as f32) / 500.0).round() as i32;
 
                 let (kind, pos_x, pos_y) =
                     match side.as_deref().map(str::to_ascii_lowercase).as_deref() {
@@ -764,7 +765,7 @@ impl RuntimeState {
                             } else {
                                 crate::anim::ClimbKind::TopCeilingLeft
                             };
-                            (k, px, 0)
+                            (k, px, -offset_top)
                         }
                         _ => {
                             if px < max_x / 2 {

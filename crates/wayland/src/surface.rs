@@ -441,9 +441,10 @@ impl WaylandShell {
     pub fn set_position(&mut self, x: i32, y: i32) {
         let (sw, sh) = self.sprite_logical_size();
         let min_x = -(sw as i32);
+        let min_y = -(sh as i32);
         let max_x = self.logical_size.0 as i32;
         let max_y = (self.logical_size.1 as i32 - sh as i32).max(0);
-        let clamped = (x.clamp(min_x, max_x), y.clamp(0, max_y));
+        let clamped = (x.clamp(min_x, max_x), y.clamp(min_y, max_y));
         if self.pet_pos != clamped {
             self.pet_pos = clamped;
             self.needs_redraw = true;
