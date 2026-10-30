@@ -126,6 +126,12 @@ enum CtlAction {
     /// List items stored in the backpack inventory
     #[command(alias = "inventory")]
     Bag,
+    /// Set the wallet balance directly (cheat / testing)
+    #[command(alias = "set-money")]
+    Money {
+        /// Exact balance to set
+        amount: f64,
+    },
     /// Trigger music dancing animation
     #[command(alias = "music")]
     Dance {
@@ -244,6 +250,7 @@ fn try_main() -> Result<()> {
                 CtlAction::Feed { item } => IpcRequest::Feed { item },
                 CtlAction::Buy { item, count } => IpcRequest::Buy { item, count },
                 CtlAction::Bag => IpcRequest::ListInventory,
+                CtlAction::Money { amount } => IpcRequest::SetMoney { amount },
                 CtlAction::Dance { loops } => IpcRequest::Dance { loops: Some(loops) },
                 CtlAction::Sleep => IpcRequest::Sleep,
                 CtlAction::Wake => IpcRequest::Wake,

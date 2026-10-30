@@ -558,6 +558,14 @@ impl RuntimeState {
                     "money": self.world.pet.money,
                 }))
             }
+            IpcRequest::SetMoney { amount } => {
+                if !amount.is_finite() || amount < 0.0 {
+                    return IpcResponse::fail("amount must be a non-negative finite number");
+                }
+                self.world.pet.money = amount;
+                self.sync_tray();
+                IpcResponse::success(serde_json::json!({ "money": self.world.pet.money }))
+            }
             IpcRequest::ListInventory => {
                 let items: Vec<_> = self
                     .world

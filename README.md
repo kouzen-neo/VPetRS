@@ -114,6 +114,7 @@ vpet-rs ctl feed "Fruit Juice"          # feed an item from the food database
 vpet-rs ctl foods [category]            # list all 151 foods (optionally by category)
 vpet-rs ctl buy "Hamburger" 3           # buy items into the backpack
 vpet-rs ctl bag                         # list backpack contents (alias: inventory)
+vpet-rs ctl money 1000000               # set wallet balance (cheat / testing)
 vpet-rs ctl dance [loops]               # dance to music (alias: music)
 vpet-rs ctl side-hide [--left|--right]  # hide behind the nearest screen edge
 vpet-rs ctl climb [left|right|top|auto] # climb a wall or the ceiling

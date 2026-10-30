@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- **Wallet Balance Command (`vpet-app`)**:
+  - Added `vpet-rs ctl money <amount>` (alias `set-money`) to set the pet's wallet balance directly for testing or sandbox play.
+
 - **Relaxed Static Pose While Held (`vpet-app`)**:
   - After holding the pet still for 1.4 seconds, she now switches from the paddling `Raised_Dynamic` loop to the relaxed blinking `Raised_Static` pose, and resumes paddling as soon as she is moved again.
 

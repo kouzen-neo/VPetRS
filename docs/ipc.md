@@ -31,6 +31,7 @@ vpet-rs ctl feed "Fruit Juice"         # Feed specific item (or `snack` for defa
 vpet-rs ctl foods [category]           # List all 151 foods, optionally filtered
 vpet-rs ctl buy "Hamburger" 3          # Buy items into the backpack (count 1..=99)
 vpet-rs ctl bag                        # List backpack contents (alias: inventory)
+vpet-rs ctl money 1000000              # Set wallet balance (cheat / testing, alias: set-money)
 vpet-rs ctl dance [loops]              # Dance to music (alias: music, default 3 loops)
 vpet-rs ctl side-hide                  # Hide behind the nearest screen edge
 vpet-rs ctl side-hide --left           # Force the left edge
@@ -63,6 +64,7 @@ Requests:
 {"cmd":"feed","item":"Fruit Juice"}
 {"cmd":"list-foods","category":"Drink"}
 {"cmd":"buy","item":"Hamburger","count":3}
+{"cmd":"set-money","amount":1000000}
 {"cmd":"list-inventory"}
 {"cmd":"dance","loops":3}
 {"cmd":"side-hide","left":true}

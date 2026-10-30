@@ -20,7 +20,7 @@ use tracing::warn;
 
 const MAX_IPC_LINE_BYTES: usize = 4096;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "cmd", rename_all = "kebab-case")]
 pub enum IpcRequest {
     Show,
@@ -29,6 +29,7 @@ pub enum IpcRequest {
     Layer { mode: String },
     Feed { item: String },
     Buy { item: String, count: u32 },
+    SetMoney { amount: f64 },
     ListInventory,
     Dance { loops: Option<u32> },
     Sleep,
